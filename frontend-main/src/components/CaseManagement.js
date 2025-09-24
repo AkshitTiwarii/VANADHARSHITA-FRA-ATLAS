@@ -39,6 +39,7 @@ import { useAuth } from '../App';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const AI_SERVICE_URL = process.env.REACT_APP_AI_SERVICE_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
 
 const CaseManagement = () => {
@@ -55,6 +56,7 @@ const CaseManagement = () => {
   const [ocrResult, setOcrResult] = useState(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState(null);
+  const [aiServiceStatus, setAiServiceStatus] = useState('checking');
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [newClaimData, setNewClaimData] = useState({
@@ -70,7 +72,21 @@ const CaseManagement = () => {
 
   useEffect(() => {
     fetchClaims();
+    checkAiServiceStatus();
   }, [statusFilter]);
+
+  const checkAiServiceStatus = async () => {
+    try {
+      const response = await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 5000 });
+      if (response.status === 200) {
+        setAiServiceStatus('online');
+      } else {
+        setAiServiceStatus('offline');
+      }
+    } catch (error) {
+      setAiServiceStatus('offline');
+    }
+  };
 
   const fetchClaims = async () => {
     try {
@@ -176,15 +192,18 @@ const CaseManagement = () => {
     }
 
     setOcrLoading(true);
+    toast.info('Processing document with AI... This may take a few seconds.');
+    
     try {
       const formData = new FormData();
       formData.append('file', ocrFile);
 
       // Call AI service
-      const response = await axios.post('http://localhost:8000/api/process-document', formData, {
+      const response = await axios.post(`${AI_SERVICE_URL}/api/process-document`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000, // 30 second timeout
       });
 
       if (response.data.success) {
@@ -192,23 +211,60 @@ const CaseManagement = () => {
         
         // Auto-fill form with extracted data
         const entities = response.data.entities;
-        setNewClaimData(prev => ({
-          ...prev,
-          beneficiary_name: entities.holder_name || prev.beneficiary_name,
-          father_name: entities.father_name || prev.father_name,
-          village: entities.village || prev.village,
-          district: entities.district || prev.district,
-          area_claimed: entities.area || prev.area_claimed,
-          survey_number: entities.survey_number || prev.survey_number,
-        }));
+        const fieldsUpdated = [];
+        
+        const updatedData = { ...newClaimData };
+        
+        if (entities.holder_name) {
+          updatedData.beneficiary_name = entities.holder_name;
+          fieldsUpdated.push('Beneficiary Name');
+        }
+        if (entities.father_name) {
+          updatedData.father_name = entities.father_name;
+          fieldsUpdated.push('Father Name');
+        }
+        if (entities.village) {
+          updatedData.village = entities.village;
+          fieldsUpdated.push('Village');
+        }
+        if (entities.district) {
+          updatedData.district = entities.district;
+          fieldsUpdated.push('District');
+        }
+        if (entities.area) {
+          updatedData.area_claimed = entities.area.toString();
+          fieldsUpdated.push('Area');
+        }
+        if (entities.survey_number) {
+          updatedData.survey_number = entities.survey_number;
+          fieldsUpdated.push('Survey Number');
+        }
+        
+        setNewClaimData(updatedData);
 
-        toast.success('Document processed successfully! Form auto-filled with extracted data.');
+        const confidence = response.data.validation?.confidence || 0;
+        const message = fieldsUpdated.length > 0 
+          ? `✅ Document processed successfully! 
+             🎯 Confidence: ${confidence.toFixed(1)}%
+             📝 Updated: ${fieldsUpdated.join(', ')}`
+          : `⚠️ Document processed but no fields could be extracted. Please fill manually.`;
+        
+        toast.success(message);
       } else {
-        throw new Error('Failed to process document');
+        throw new Error(response.data.message || 'Failed to process document');
       }
     } catch (error) {
       console.error('OCR processing error:', error);
-      toast.error('Failed to process document. Make sure AI service is running.');
+      
+      if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        toast.error('❌ AI Service not running! Please start the AI service on port 8000.');
+      } else if (error.response?.status === 422) {
+        toast.error('📷 Could not extract text from image. Please ensure the document is clear and readable.');
+      } else if (error.response?.status === 400) {
+        toast.error('📄 Invalid file type. Please upload JPG, PNG, or TIFF images.');
+      } else {
+        toast.error(`❌ Processing failed: ${error.response?.data?.detail || error.message}`);
+      }
     } finally {
       setOcrLoading(false);
     }
@@ -374,9 +430,24 @@ const CaseManagement = () => {
           <Dialog open={showOcrDialog} onOpenChange={setShowOcrDialog}>
             <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
               <DialogHeader className="border-b pb-4 mb-6">
-                <DialogTitle className="flex items-center text-xl">
-                  <Bot className="w-6 h-6 mr-3 text-purple-600" />
-                  AI-Powered Document Processing
+                <DialogTitle className="flex items-center justify-between text-xl">
+                  <div className="flex items-center">
+                    <Bot className="w-6 h-6 mr-3 text-purple-600" />
+                    AI-Powered Document Processing
+                  </div>
+                  <div className="flex items-center text-sm">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                      aiServiceStatus === 'online' ? 'bg-green-500' : 
+                      aiServiceStatus === 'offline' ? 'bg-red-500' : 'bg-yellow-500'
+                    }`}></div>
+                    <span className={`${
+                      aiServiceStatus === 'online' ? 'text-green-600' : 
+                      aiServiceStatus === 'offline' ? 'text-red-600' : 'text-yellow-600'
+                    }`}>
+                      AI Service: {aiServiceStatus === 'online' ? 'Ready' : 
+                                  aiServiceStatus === 'offline' ? 'Offline' : 'Checking...'}
+                    </span>
+                  </div>
                 </DialogTitle>
                 <DialogDescription className="text-gray-600 mt-2">
                   Upload a document image or use your camera to extract information using OCR and NLP
