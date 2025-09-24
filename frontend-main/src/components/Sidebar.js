@@ -2,14 +2,14 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from '../contexts/LanguageContext';
 import { 
+  Home,
   LayoutDashboard, 
   Map, 
   FileText, 
   BarChart3, 
   Shield,
   Trees,
-  Upload,
-  UserCog
+  Upload
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, userRole }) => {
@@ -17,16 +17,22 @@ const Sidebar = ({ isOpen, userRole }) => {
   
   const navigationItems = [
     {
+      name: t('home'),
+      href: '/',
+      icon: Home,
+      roles: ['admin', 'officer', 'verifier', 'viewer']
+    },
+    {
       name: t('dashboard'),
       href: '/dashboard',
       icon: LayoutDashboard,
       roles: ['admin', 'officer', 'verifier', 'viewer']
     },
     {
-      name: t('forestAtlas'),
-      href: '/atlas',
-      icon: Map,
-      roles: ['admin', 'officer', 'verifier', 'viewer']
+      name: t('officerDashboard'),
+      href: '/officer-dashboard',
+      icon: Shield,
+      roles: ['admin', 'officer']
     },
     {
       name: t('caseManagement'),
@@ -35,28 +41,28 @@ const Sidebar = ({ isOpen, userRole }) => {
       roles: ['admin', 'officer', 'verifier']
     },
     {
+      name: t('forestAtlas'),
+      href: '/atlas',
+      icon: Map,
+      roles: ['admin', 'officer', 'verifier', 'viewer']
+    },
+    {
       name: t('analytics'),
       href: '/analytics',
       icon: BarChart3,
       roles: ['admin', 'officer']
     },
     {
-      name: 'Data Upload',
-      href: '/data-upload',
-      icon: Upload,
-      roles: ['admin', 'officer']
-    },
-    {
-      name: 'FRA Admin',
-      href: '/fra-admin',
-      icon: UserCog,
-      roles: ['admin']
-    },
-    {
       name: t('adminPanel'),
       href: '/admin',
       icon: Shield,
       roles: ['admin']
+    },
+    {
+      name: t('publicTransparencyPortal'),
+      href: '/transparency',
+      icon: BarChart3,
+      roles: ['admin', 'officer', 'verifier', 'viewer']
     }
   ];
 

@@ -95,8 +95,8 @@ class DocumentProcessor:
             logger.error(f"Image preprocessing error: {str(e)}")
             return None
 
-    def extract_text_from_image(self, image_path):
-        """Extract text using OCR"""
+    def extract_text_from_image(self, image_path, language="auto"):
+        """Extract text using OCR with multilingual support"""
         try:
             # Preprocess image
             processed_img = self.preprocess_image(image_path)
@@ -104,22 +104,176 @@ class DocumentProcessor:
                 # Fallback to original image
                 processed_img = cv2.imread(image_path)
             
+            # Language mapping for Tesseract
+            language_map = {
+                'auto': 'eng+hin+ori+tel+ben+san',  # Multi-language detection
+                'eng': 'eng',
+                'hin': 'hin',
+                'ori': 'ori',  # Odia
+                'tel': 'tel',  # Telugu
+                'ben': 'ben',  # Bengali
+                'san': 'san'   # Sanskrit
+            }
+            
+            # Get Tesseract language parameter
+            tesseract_lang = language_map.get(language, 'eng+hin')
+            
             # OCR configuration for better results
-            custom_config = r'--oem 3 --psm 6 -l eng+hin'
+            custom_config = f'--oem 3 --psm 6 -l {tesseract_lang}'
             
             # Extract text
             text = pytesseract.image_to_string(processed_img, config=custom_config)
             
-            logger.info(f"Extracted text length: {len(text)}")
-            return text.strip()
+            # Detect language from extracted text
+            detected_language = self.detect_language(text)
+            
+            logger.info(f"Extracted text length: {len(text)}, Detected language: {detected_language}")
+            return text.strip(), detected_language
         except Exception as e:
             logger.error(f"OCR extraction error: {str(e)}")
-            return ""
+            return "", "unknown"
 
-    def extract_entities(self, text):
-        """Extract structured data from OCR text"""
+    def detect_language(self, text):
+        """Simple language detection based on character patterns"""
+        if not text:
+            return "unknown"
+        
+        # Count different script characters
+        hindi_chars = len(re.findall(r'[\u0900-\u097F]', text))
+        odia_chars = len(re.findall(r'[\u0B00-\u0B7F]', text))
+        telugu_chars = len(re.findall(r'[\u0C00-\u0C7F]', text))
+        bengali_chars = len(re.findall(r'[\u0980-\u09FF]', text))
+        english_chars = len(re.findall(r'[a-zA-Z]', text))
+        
+        total_chars = len(text.replace(' ', ''))
+        
+        if total_chars == 0:
+            return "unknown"
+        
+        # Determine dominant language
+        if hindi_chars / total_chars > 0.3:
+            return "hindi"
+        elif odia_chars / total_chars > 0.3:
+            return "odia"
+        elif telugu_chars / total_chars > 0.3:
+            return "telugu"
+        elif bengali_chars / total_chars > 0.3:
+            return "bengali"
+        elif english_chars / total_chars > 0.5:
+            return "english"
+        else:
+            return "mixed"
+
+    def detect_form_type(self, text):
+        """Detect FRA form type based on text content"""
+        text_lower = text.lower()
+        
+        # Form-A (Individual Forest Rights) indicators
+        form_a_indicators = [
+            'form-a', 'form a', 'forestland', 'individual forest rights',
+            'ifr', 'individual rights', 'forest land rights',
+            'वन भूमि के अधिकारों', 'व्यक्तिगत वन अधिकार',
+            'holder', 'claimant', 'applicant for forest rights'
+        ]
+        
+        # Form-B (Community Rights) indicators  
+        form_b_indicators = [
+            'form-b', 'form b', 'community rights', 'cfr',
+            'community forest rights', 'collective rights',
+            'सामुदायिक अधिकार', 'सामुदायिक वन अधिकार',
+            'gram sabha', 'village community', 'community claim'
+        ]
+        
+        # Form-C (Community Forest Resource Rights) indicators
+        form_c_indicators = [
+            'form-c', 'form c', 'community forest resource',
+            'forest resource rights', 'cfrr', 'resource rights',
+            'सामुदायिक वन संसाधन अधिकार', 'वन संसाधन',
+            'nistar rights', 'minor forest produce', 'mfp'
+        ]
+        
+        # Count matches for each form type
+        form_a_score = sum(1 for indicator in form_a_indicators if indicator in text_lower)
+        form_b_score = sum(1 for indicator in form_b_indicators if indicator in text_lower)
+        form_c_score = sum(1 for indicator in form_c_indicators if indicator in text_lower)
+        
+        # Additional contextual clues
+        if 'individual' in text_lower and ('forest' in text_lower or 'land' in text_lower):
+            form_a_score += 2
+        if 'community' in text_lower and 'gram sabha' in text_lower:
+            form_b_score += 2
+        if 'resource' in text_lower and 'community' in text_lower:
+            form_c_score += 2
+            
+        # Determine form type based on highest score
+        max_score = max(form_a_score, form_b_score, form_c_score)
+        
+        if max_score == 0:
+            return "Unknown", 0.0
+        elif form_a_score == max_score:
+            return "FORM-A", form_a_score / (form_a_score + form_b_score + form_c_score)
+        elif form_b_score == max_score:
+            return "FORM-B", form_b_score / (form_a_score + form_b_score + form_c_score)
+        else:
+            return "FORM-C", form_c_score / (form_a_score + form_b_score + form_c_score)
+
+    def extract_entities(self, text, form_type="FORM-A"):
+        """Extract structured data from OCR text based on form type"""
         entities = {}
         
+        # Update patterns based on form type
+        if form_type == "FORM-A":
+            # Individual Forest Rights specific patterns
+            self.patterns.update({
+                'claimant_name': [
+                    r'(?:name of claimant|claimant name|applicant name)[\s:]*([a-zA-Z\s]+)',
+                    r'नाम[\s:]*([^\n]+)',
+                    r'आवेदक का नाम[\s:]*([^\n]+)'
+                ],
+                'husband_father_name': [
+                    r'(?:father|husband|spouse)[\s:]*([a-zA-Z\s]+)',
+                    r'पिता/पति का नाम[\s:]*([^\n]+)',
+                    r'स/पु[\s:]*([^\n]+)'
+                ],
+                'forest_village_name': [
+                    r'(?:forest village|वन ग्राम)[\s:]*([^\n]+)',
+                    r'forest village name[\s:]*([^\n]+)'
+                ]
+            })
+        elif form_type == "FORM-B":
+            # Community Rights specific patterns
+            self.patterns.update({
+                'gram_sabha_name': [
+                    r'(?:gram sabha|ग्राम सभा)[\s:]*([^\n]+)',
+                    r'name of gram sabha[\s:]*([^\n]+)'
+                ],
+                'community_name': [
+                    r'(?:community name|समुदाय का नाम)[\s:]*([^\n]+)',
+                    r'name of community[\s:]*([^\n]+)'
+                ],
+                'total_families': [
+                    r'(?:total families|कुल परिवार)[\s:]*([0-9]+)',
+                    r'number of families[\s:]*([0-9]+)'
+                ]
+            })
+        elif form_type == "FORM-C":
+            # Community Forest Resource Rights specific patterns
+            self.patterns.update({
+                'resource_type': [
+                    r'(?:type of resource|संसाधन का प्रकार)[\s:]*([^\n]+)',
+                    r'forest resource[\s:]*([^\n]+)'
+                ],
+                'seasonal_access': [
+                    r'(?:seasonal access|मौसमी पहुंच)[\s:]*([^\n]+)',
+                    r'access period[\s:]*([^\n]+)'
+                ],
+                'traditional_use': [
+                    r'(?:traditional use|पारंपरिक उपयोग)[\s:]*([^\n]+)',
+                    r'customary use[\s:]*([^\n]+)'
+                ]
+            })
+        
+        # Extract entities using patterns
         for field, patterns in self.patterns.items():
             for pattern in patterns:
                 match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
@@ -175,7 +329,11 @@ async def health_check():
     }
 
 @app.post("/api/process-document")
-async def process_document(file: UploadFile = File(...)):
+async def process_document(
+    file: UploadFile = File(...),
+    language: str = "auto",
+    target_language: str = "en"
+):
     """Process uploaded document and extract forest rights claim information"""
     
     if not file:
@@ -200,16 +358,19 @@ async def process_document(file: UploadFile = File(...)):
             content = await file.read()
             await f.write(content)
         
-        logger.info(f"Processing file: {filename}")
+        logger.info(f"Processing file: {filename} with language: {language}")
         
-        # Extract text from image
-        extracted_text = processor.extract_text_from_image(file_path)
+        # Extract text from image with language support
+        extracted_text, detected_language = processor.extract_text_from_image(file_path, language)
         
         if not extracted_text:
             raise HTTPException(status_code=422, detail="Could not extract text from image")
         
-        # Extract structured entities
-        entities = processor.extract_entities(extracted_text)
+        # Detect form type
+        form_type, confidence = processor.detect_form_type(extracted_text)
+        
+        # Extract structured entities based on detected form type
+        entities = processor.extract_entities(extracted_text, form_type)
         
         # Validate extraction quality
         validation = processor.validate_extraction(entities)
@@ -225,8 +386,14 @@ async def process_document(file: UploadFile = File(...)):
             "message": "Document processed successfully",
             "filename": file.filename,
             "extracted_text": extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
+            "language_detected": detected_language,
+            "ocr_language": language,
+            "target_language": target_language,
+            "form_type": form_type,
+            "form_detection_confidence": confidence,
             "entities": entities,
             "validation": validation,
+            "confidence_score": validation['confidence'] / 100,
             "processing_time": datetime.now().isoformat()
         }
         

@@ -25,7 +25,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const Dashboard = () => {
-  const { translate: t } = useTranslation();
+  const { translate: t, currentLanguage } = useTranslation();
   const [stats, setStats] = useState(null);
   const [recentClaims, setRecentClaims] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +103,7 @@ const Dashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold mb-2 text-orange-300">
-              Welcome back, {user?.full_name}
+              {t('welcome')}, {user?.full_name}
             </h1>
             <p className="text-blue-100">
               {user?.role && user.role.charAt(0).toUpperCase() + user.role.slice(1)} | {user?.department}
@@ -116,8 +116,15 @@ const Dashboard = () => {
             )}
           </div>
           <div className="text-right">
-            <p className="text-blue-200 text-sm">Today's Date</p>
-            <p className="text-xl font-semibold">{new Date().toLocaleDateString('en-IN')}</p>
+            <p className="text-blue-200 text-sm">{t('todaysDate')}</p>
+            <p className="text-xl font-semibold">
+              {new Date().toLocaleDateString(
+                currentLanguage === 'bn' ? 'bn-BD' : 
+                currentLanguage === 'hi' ? 'hi-IN' : 
+                currentLanguage === 'or' ? 'or-IN' : 
+                currentLanguage === 'te' ? 'te-IN' : 'en-IN'
+              )}
+            </p>
           </div>
         </div>
       </div>
@@ -128,9 +135,9 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Total Villages</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('totalVillages')}</p>
                 <p className="text-3xl font-bold text-blue-900">{stats?.total_villages || 0}</p>
-                <p className="text-xs text-slate-500 mt-1">Covered under FRA</p>
+                <p className="text-xs text-slate-500 mt-1">{t('coveredUnderFRA')}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <TreePine className="w-6 h-6 text-blue-600" />
@@ -143,9 +150,9 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Forest Claims</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('forestClaims')}</p>
                 <p className="text-3xl font-bold text-green-700">{stats?.total_claims || 0}</p>
-                <p className="text-xs text-slate-500 mt-1">IFR + CFR Applications</p>
+                <p className="text-xs text-slate-500 mt-1">{t('ifrCfrApplications')}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                 <FileText className="w-6 h-6 text-green-600" />
@@ -158,9 +165,9 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Pending Review</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('pendingReview')}</p>
                 <p className="text-3xl font-bold text-orange-600">{stats?.pending_claims || 0}</p>
-                <p className="text-xs text-slate-500 mt-1">Awaiting approval</p>
+                <p className="text-xs text-slate-500 mt-1">{t('awaitingApproval')}</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
                 <Clock className="w-6 h-6 text-orange-600" />
@@ -173,7 +180,7 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Budget Linked</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('budgetLinked')}</p>
                 <p className="text-2xl font-bold text-purple-700">
                   {stats?.total_budget_linked ? formatCurrency(stats.total_budget_linked) : '₹0'}
                 </p>
@@ -193,9 +200,9 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <BarChart3 className="w-5 h-5 text-blue-600" />
-              <span>Claims Status Overview</span>
+              <span>{t('claimsStatusOverview')}</span>
             </CardTitle>
-            <CardDescription>Current status of forest rights claims</CardDescription>
+            <CardDescription>{t('currentStatusForestRightsClaims')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -203,8 +210,8 @@ const Dashboard = () => {
                 <div className="flex items-center space-x-3">
                   <CheckCircle className="w-8 h-8 text-green-600" />
                   <div>
-                    <p className="font-medium text-green-800">Approved Claims</p>
-                    <p className="text-sm text-green-600">Successfully processed</p>
+                    <p className="font-medium text-green-800">{t('approvedClaims')}</p>
+                    <p className="text-sm text-green-600">{t('successfullyProcessed')}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -219,8 +226,8 @@ const Dashboard = () => {
                 <div className="flex items-center space-x-3">
                   <Clock className="w-8 h-8 text-yellow-600" />
                   <div>
-                    <p className="font-medium text-yellow-800">Pending Claims</p>
-                    <p className="text-sm text-yellow-600">Under processing</p>
+                    <p className="font-medium text-yellow-800">{t('pendingClaims')}</p>
+                    <p className="text-sm text-yellow-600">{t('underProcessing')}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -235,8 +242,8 @@ const Dashboard = () => {
                 <div className="flex items-center space-x-3">
                   <AlertTriangle className="w-8 h-8 text-orange-600" />
                   <div>
-                    <p className="font-medium text-orange-800">Disputed Claims</p>
-                    <p className="text-sm text-orange-600">Require resolution</p>
+                    <p className="font-medium text-orange-800">{t('disputedClaims')}</p>
+                    <p className="text-sm text-orange-600">{t('requireResolution')}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -255,42 +262,42 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Activity className="w-5 h-5 text-green-600" />
-              <span>System Health</span>
+              <span>{t('systemHealth')}</span>
             </CardTitle>
-            <CardDescription>Platform performance metrics</CardDescription>
+            <CardDescription>{t('platformPerformanceMetrics')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">OCR Accuracy</span>
+              <span className="text-sm font-medium">{t('ocrAccuracy')}</span>
               <Badge className="bg-green-100 text-green-800">
                 {stats?.ocr_accuracy || 0}%
               </Badge>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Schemes Integrated</span>
+              <span className="text-sm font-medium">{t('schemesIntegrated')}</span>
               <Badge className="bg-blue-100 text-blue-800">
                 {stats?.schemes_integrated || 0}
               </Badge>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Database Status</span>
+              <span className="text-sm font-medium">{t('databaseStatus')}</span>
               <div className="flex items-center space-x-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-green-600">Connected</span>
+                <span className="text-sm text-green-600">{t('connected')}</span>
               </div>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Last Sync</span>
-              <span className="text-sm text-slate-600">2 min ago</span>
+              <span className="text-sm font-medium">{t('lastSync')}</span>
+              <span className="text-sm text-slate-600">{t('minutesAgo', { minutes: 2 })}</span>
             </div>
 
             <div className="pt-4 border-t">
               <Button className="w-full bg-blue-600 hover:bg-blue-700">
                 <TrendingUp className="w-4 h-4 mr-2" />
-                View Full Analytics
+                {t('viewFullAnalytics')}
               </Button>
             </div>
           </CardContent>
@@ -307,10 +314,10 @@ const Dashboard = () => {
             </div>
             <Button variant="outline" size="sm">
               <ExternalLink className="w-4 h-4 mr-2" />
-              View All
+              {t('viewAll')}
             </Button>
           </CardTitle>
-          <CardDescription>Latest forest rights applications</CardDescription>
+          <CardDescription>{t('latestApplications')}</CardDescription>
         </CardHeader>
         <CardContent>
           {recentClaims.length > 0 ? (

@@ -9,13 +9,19 @@ import { Toaster } from './components/ui/sonner';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Login from './components/Login';
+import Home from './components/Home';
 import Dashboard from './components/Dashboard';
-import ForestAtlas from './components/ForestAtlas';
+// import ForestAtlas from './components/ForestAtlas';
 import CaseManagement from './components/CaseManagement';
 import Analytics from './components/Analytics';
 import AdminPanel from './components/AdminPanel';
 import FRAAtlasAdmin from './components/FRAAtlasAdmin';
 import CSVDataUpload from './components/CSVDataUpload';
+import OfficerDashboard from './components/OfficerDashboard';
+import PublicTransparencyPortal from './components/PublicTransparencyPortal';
+import CitizenPortal from './components/CitizenPortal';
+import SimpleMapTest from './components/SimpleMapTest';
+import ForestAtlasFixed from './components/ForestAtlasFixed';
 
 // Auth Context
 const AuthContext = React.createContext();
@@ -127,9 +133,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/" element={
                 <ProtectedRoute>
-                  <MainLayout>
-                    <Dashboard />
-                  </MainLayout>
+                  <Home />
                 </ProtectedRoute>
               } />
               <Route path="/dashboard" element={
@@ -142,7 +146,14 @@ function App() {
               <Route path="/atlas" element={
                 <ProtectedRoute>
                   <MainLayout>
-                    <ForestAtlas />
+                    <ForestAtlasFixed />
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/map-test" element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <SimpleMapTest />
                   </MainLayout>
                 </ProtectedRoute>
               } />
@@ -180,6 +191,23 @@ function App() {
                     <CSVDataUpload />
                   </MainLayout>
                 </ProtectedRoute>
+              } />
+              <Route path="/officer-dashboard" element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <OfficerDashboard />
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/transparency" element={
+                <MainLayout>
+                  <PublicTransparencyPortal />
+                </MainLayout>
+              } />
+              <Route path="/citizen-portal" element={
+                <MainLayout>
+                  <CitizenPortal />
+                </MainLayout>
               } />
             </Routes>
             <Toaster position="top-right" richColors />

@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Menu, X, Bell, LogOut, User, Settings, Trees, Globe } from 'lucide-react';
 import { useAuth } from '../App';
 import { useTranslation } from '../contexts/LanguageContext';
+import LanguageSelector from './LanguageSelector';
 
 const Header = ({ user, sidebarOpen, setSidebarOpen }) => {
   const { logout } = useAuth();
@@ -53,18 +54,9 @@ const Header = ({ user, sidebarOpen, setSidebarOpen }) => {
 
         {/* Right Section */}
         <div className="flex items-center space-x-3">
-          {/* Language Selector */}
-          <div className="hidden md:flex items-center space-x-1 text-sm">
-            <span className="text-slate-600">{t('language')}:</span>
-            <select 
-              value={currentLanguage}
-              onChange={handleLanguageChange}
-              className="bg-transparent border-none text-blue-900 font-medium cursor-pointer focus:outline-none"
-            >
-              <option value="en">English</option>
-              <option value="hi">हिंदी</option>
-              <option value="tribal">Tribal Languages</option>
-            </select>
+          {/* Enhanced Language Selector */}
+          <div className="hidden md:block">
+            <LanguageSelector />
           </div>
 
           {/* Notifications */}

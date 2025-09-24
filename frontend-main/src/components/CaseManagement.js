@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../App';
+import { useTranslation } from '../contexts/LanguageContext';
+import LanguageSelector from './LanguageSelector';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -43,6 +45,7 @@ const AI_SERVICE_URL = process.env.REACT_APP_AI_SERVICE_URL || 'http://localhost
 const API = `${BACKEND_URL}/api`;
 
 const CaseManagement = () => {
+  const { t, translateDynamic, currentLanguage, isTranslating } = useTranslation();
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,16 +60,37 @@ const CaseManagement = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState(null);
   const [aiServiceStatus, setAiServiceStatus] = useState('checking');
+  const [ocrLanguage, setOcrLanguage] = useState('auto'); // For multilingual OCR
+  const [translatedOcrResult, setTranslatedOcrResult] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [newClaimData, setNewClaimData] = useState({
-    beneficiary_name: '',
-    father_name: '',
+    // Personal Details
+    claimant_name: '',
+    husband_father_name: '',
+    age: '',
+    address: '',
     village: '',
+    gram_panchayat: '',
+    tehsil: '',
     district: '',
-    area_claimed: '',
+    state: '',
+    // Forest Land Details
+    forest_village_name: '',
+    range: '',
+    division: '',
+    forest_block: '',
     survey_number: '',
-    claim_type: 'Individual Forest Rights'
+    khasra_number: '',
+    area_claimed: '',
+    // Claim Details
+    claim_type: 'Individual Forest Rights',
+    occupation_period: '',
+    evidence_of_occupation: '',
+    // Additional Requirements
+    community_certificate: '',
+    residence_proof: '',
+    land_records: ''
   });
   const { user } = useAuth();
 
@@ -105,9 +129,10 @@ const CaseManagement = () => {
 
   const filteredClaims = claims.filter(claim => {
     const matchesSearch = 
-      claim.beneficiary_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      claim.village_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      claim.claim_number.toLowerCase().includes(searchTerm.toLowerCase());
+      (claim.claimant_name || claim.beneficiary_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (claim.village || claim.village_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (claim.claim_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (claim.survey_number || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = !statusFilter || statusFilter === 'all' || claim.status === statusFilter;
     
@@ -187,16 +212,18 @@ const CaseManagement = () => {
 
   const processDocument = async () => {
     if (!ocrFile) {
-      toast.error('Please select a document image first');
+      toast.error(t('selectDocumentFirst') || 'Please select a document image first');
       return;
     }
 
     setOcrLoading(true);
-    toast.info('Processing document with AI... This may take a few seconds.');
+    toast.info(t('processingDocument') || 'Processing document with AI... This may take a few seconds.');
     
     try {
       const formData = new FormData();
       formData.append('file', ocrFile);
+      formData.append('language', ocrLanguage);
+      formData.append('target_language', currentLanguage);
 
       // Call AI service
       const response = await axios.post(`${AI_SERVICE_URL}/api/process-document`, formData, {
@@ -209,31 +236,88 @@ const CaseManagement = () => {
       if (response.data.success) {
         setOcrResult(response.data);
         
+        // Translate OCR results if needed
+        if (currentLanguage !== 'en' && response.data.extracted_text) {
+          try {
+            const translatedText = await translateDynamic(response.data.extracted_text, currentLanguage);
+            setTranslatedOcrResult({
+              ...response.data,
+              extracted_text: translatedText,
+              original_text: response.data.extracted_text
+            });
+          } catch (translationError) {
+            console.error('Translation failed:', translationError);
+            setTranslatedOcrResult(null);
+          }
+        } else {
+          setTranslatedOcrResult(null);
+        }
+        
         // Auto-fill form with extracted data
         const entities = response.data.entities;
         const fieldsUpdated = [];
         
         const updatedData = { ...newClaimData };
         
-        if (entities.holder_name) {
-          updatedData.beneficiary_name = entities.holder_name;
-          fieldsUpdated.push('Beneficiary Name');
+        if (entities.holder_name || entities.claimant_name || entities.name) {
+          updatedData.claimant_name = entities.holder_name || entities.claimant_name || entities.name;
+          fieldsUpdated.push('Claimant Name');
         }
-        if (entities.father_name) {
-          updatedData.father_name = entities.father_name;
-          fieldsUpdated.push('Father Name');
+        if (entities.father_name || entities.husband_name) {
+          updatedData.husband_father_name = entities.father_name || entities.husband_name;
+          fieldsUpdated.push('Husband/Father Name');
+        }
+        if (entities.age) {
+          updatedData.age = entities.age;
+          fieldsUpdated.push('Age');
+        }
+        if (entities.address) {
+          updatedData.address = entities.address;
+          fieldsUpdated.push('Address');
         }
         if (entities.village) {
           updatedData.village = entities.village;
           fieldsUpdated.push('Village');
         }
+        if (entities.gram_panchayat || entities.panchayat) {
+          updatedData.gram_panchayat = entities.gram_panchayat || entities.panchayat;
+          fieldsUpdated.push('Gram Panchayat');
+        }
+        if (entities.tehsil || entities.taluk) {
+          updatedData.tehsil = entities.tehsil || entities.taluk;
+          fieldsUpdated.push('Tehsil');
+        }
         if (entities.district) {
           updatedData.district = entities.district;
           fieldsUpdated.push('District');
         }
-        if (entities.area) {
-          updatedData.area_claimed = entities.area.toString();
-          fieldsUpdated.push('Area');
+        if (entities.state) {
+          updatedData.state = entities.state;
+          fieldsUpdated.push('State');
+        }
+        if (entities.forest_village) {
+          updatedData.forest_village_name = entities.forest_village;
+          fieldsUpdated.push('Forest Village');
+        }
+        if (entities.range) {
+          updatedData.range = entities.range;
+          fieldsUpdated.push('Range');
+        }
+        if (entities.division) {
+          updatedData.division = entities.division;
+          fieldsUpdated.push('Division');
+        }
+        if (entities.survey_number || entities.survey_no) {
+          updatedData.survey_number = entities.survey_number || entities.survey_no;
+          fieldsUpdated.push('Survey Number');
+        }
+        if (entities.khasra_number || entities.khasra_no) {
+          updatedData.khasra_number = entities.khasra_number || entities.khasra_no;
+          fieldsUpdated.push('Khasra Number');
+        }
+        if (entities.area || entities.area_claimed) {
+          updatedData.area_claimed = entities.area || entities.area_claimed;
+          fieldsUpdated.push('Area Claimed');
         }
         if (entities.survey_number) {
           updatedData.survey_number = entities.survey_number;
@@ -243,6 +327,14 @@ const CaseManagement = () => {
         setNewClaimData(updatedData);
 
         const confidence = response.data.validation?.confidence || 0;
+        const formType = response.data.form_type || 'Unknown';
+        const formConfidence = response.data.form_detection_confidence || 0;
+        
+        // Show form detection results
+        if (formType !== 'Unknown' && formConfidence > 0.3) {
+          toast.info(`📋 Detected: ${formType} (${(formConfidence * 100).toFixed(1)}% confidence)`);
+        }
+        
         const message = fieldsUpdated.length > 0 
           ? `✅ Document processed successfully! 
              🎯 Confidence: ${confidence.toFixed(1)}%
@@ -457,8 +549,83 @@ const CaseManagement = () => {
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 {/* Document Upload Section */}
                 <div className="space-y-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Document Processing</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">{t('documentProcessing') || 'Document Processing'}</h3>
+                    <div className="flex items-center space-x-3">
+                      <LanguageSelector />
+                    </div>
+                  </div>
+
+                  {/* OCR Language Selection */}
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <h4 className="text-sm font-semibold text-purple-800 mb-3 flex items-center">
+                      <Globe className="w-4 h-4 mr-2" />
+                      {t('ocrLanguageSettings') || 'OCR Language Settings'}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-2">
+                          {t('documentLanguage') || 'Document Language:'}
+                        </label>
+                        <Select value={ocrLanguage} onValueChange={setOcrLanguage}>
+                          <SelectTrigger className="bg-white border-purple-300">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">🤖 Auto-detect</SelectItem>
+                            <SelectItem value="eng">🇬🇧 English</SelectItem>
+                            <SelectItem value="hin">🇮🇳 Hindi (हिन्दी)</SelectItem>
+                            <SelectItem value="ori">🏛️ Odia (ଓଡ଼ିଆ)</SelectItem>
+                            <SelectItem value="tel">🏛️ Telugu (తెలుగు)</SelectItem>
+                            <SelectItem value="ben">🏛️ Bengali (বাংলা)</SelectItem>
+                            <SelectItem value="san">🌿 Sanskrit</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-2">
+                          {t('targetLanguage') || 'Target Language:'}
+                        </label>
+                        <div className="bg-white border border-purple-300 rounded-md px-3 py-2 text-sm">
+                          {currentLanguage === 'en' ? '🇬🇧 English' :
+                           currentLanguage === 'hi' ? '🇮🇳 Hindi' :
+                           currentLanguage === 'or' ? '🏛️ Odia' :
+                           currentLanguage === 'te' ? '🏛️ Telugu' :
+                           currentLanguage === 'bn' ? '🏛️ Bengali' :
+                           currentLanguage === 'sat' ? '🌿 Santali' :
+                           currentLanguage === 'gon' ? '🌿 Gondi' :
+                           currentLanguage === 'kok' ? '🌿 Kokborok' :
+                           'Current Language'}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-purple-600 mt-2">
+                      💡 {t('ocrLanguageHint') || 'Documents will be translated to your current interface language automatically'}
+                    </p>
+                  </div>
                   
+                  {/* Form Type Selection */}
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Expected Form Type (Optional)
+                    </h4>
+                    <Select value={newClaimData.claim_type} onValueChange={(value) => setNewClaimData(prev => ({...prev, claim_type: value}))}>
+                      <SelectTrigger className="w-full bg-white">
+                        <SelectValue placeholder="Auto-detect or select form type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Individual Forest Rights">📋 FORM-A: Individual Forest Rights (IFR)</SelectItem>
+                        <SelectItem value="Community Forest Rights">🏘️ FORM-B: Community Forest Rights (CFR)</SelectItem>
+                        <SelectItem value="Community Forest Resource Rights">🌿 FORM-C: Community Forest Resource Rights</SelectItem>
+                        <SelectItem value="Development Rights">🚧 Development Rights</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-blue-600 mt-2">
+                      💡 Our AI will auto-detect the form type, but you can pre-select if known
+                    </p>
+                  </div>
+
                   <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50">
                     {!showCamera ? (
                       <>
@@ -588,14 +755,54 @@ const CaseManagement = () => {
                         <div className="bg-gray-50 p-4 rounded-lg">
                           <h5 className="font-medium mb-2 text-gray-800 flex items-center">
                             <FileText className="w-4 h-4 mr-2" />
-                            Extracted Text
+                            {t('extractedText') || 'Extracted Text'}
                           </h5>
-                          <div className="text-sm text-gray-600 max-h-32 overflow-y-auto bg-white p-2 rounded border">
-                            {ocrResult.extracted_text || 'No text extracted'}
+                          
+                          {/* Translated Text (if available) */}
+                          {translatedOcrResult && currentLanguage !== 'en' && (
+                            <div className="mb-3">
+                              <div className="flex items-center mb-2">
+                                <Globe className="w-3 h-3 mr-1 text-blue-600" />
+                                <span className="text-xs font-medium text-blue-700">
+                                  {t('translatedTo') || 'Translated to'} {currentLanguage.toUpperCase()}
+                                  {isTranslating && <Loader2 className="w-3 h-3 ml-1 animate-spin inline" />}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-700 max-h-24 overflow-y-auto bg-blue-50 p-2 rounded border border-blue-200">
+                                {translatedOcrResult.extracted_text || t('translationInProgress') || 'Translation in progress...'}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Original Text */}
+                          <div>
+                            {translatedOcrResult && (
+                              <div className="flex items-center mb-2">
+                                <span className="text-xs font-medium text-gray-600">
+                                  {t('originalText') || 'Original Text'}
+                                </span>
+                              </div>
+                            )}
+                            <div className="text-sm text-gray-600 max-h-32 overflow-y-auto bg-white p-2 rounded border">
+                              {ocrResult.extracted_text || t('noTextExtracted') || 'No text extracted'}
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Language: {ocrResult.language_detected || 'Auto-detected'}
-                          </p>
+                          
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-xs text-gray-500">
+                              {t('detectedLanguage') || 'Language'}: {ocrResult.language_detected || 'Auto-detected'}
+                            </p>
+                            {translatedOcrResult && (
+                              <Button
+                                variant="ghost" 
+                                size="sm"
+                                className="text-xs p-1 h-6"
+                                onClick={() => setTranslatedOcrResult(null)}
+                              >
+                                {t('showOriginalOnly') || 'Show Original Only'}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         
                         <div className="bg-blue-50 p-4 rounded-lg">
@@ -793,84 +1000,355 @@ const CaseManagement = () => {
                 <div className="space-y-6">
                   <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">New Claim Form</h3>
                   
-                  <div className="grid grid-cols-1 gap-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Beneficiary Name
-                        </label>
-                        <Input
-                          value={newClaimData.beneficiary_name}
-                          onChange={(e) => setNewClaimData(prev => ({...prev, beneficiary_name: e.target.value}))}
-                          placeholder="Enter beneficiary name"
-                          className="w-full"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Father's Name
-                        </label>
-                        <Input
-                          value={newClaimData.father_name}
-                          onChange={(e) => setNewClaimData(prev => ({...prev, father_name: e.target.value}))}
-                          placeholder="Enter father's name"
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Village
-                        </label>
-                        <Input
-                          value={newClaimData.village}
-                          onChange={(e) => setNewClaimData(prev => ({...prev, village: e.target.value}))}
-                          placeholder="Village name"
-                          className="w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          District
-                        </label>
-                        <Input
-                          value={newClaimData.district}
-                          onChange={(e) => setNewClaimData(prev => ({...prev, district: e.target.value}))}
-                          placeholder="District name"
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Area Claimed (Hectares)
-                        </label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={newClaimData.area_claimed}
-                          onChange={(e) => setNewClaimData(prev => ({...prev, area_claimed: e.target.value}))}
-                          placeholder="0.00"
-                          className="w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Survey Number
-                        </label>
-                        <Input
-                          value={newClaimData.survey_number}
-                          onChange={(e) => setNewClaimData(prev => ({...prev, survey_number: e.target.value}))}
-                          placeholder="Survey number"
-                          className="w-full"
-                        />
+                  <div className="grid grid-cols-1 gap-8">
+                    {/* Personal Details Section */}
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-blue-800 mb-4">Personal Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Claimant Name *
+                          </label>
+                          <Input
+                            value={newClaimData.claimant_name}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, claimant_name: e.target.value}))}
+                            placeholder="Enter claimant name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Husband/Father's Name *
+                          </label>
+                          <Input
+                            value={newClaimData.husband_father_name}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, husband_father_name: e.target.value}))}
+                            placeholder="Enter husband/father's name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Age
+                          </label>
+                          <Input
+                            type="number"
+                            value={newClaimData.age}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, age: e.target.value}))}
+                            placeholder="Enter age"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Address
+                          </label>
+                          <Input
+                            value={newClaimData.address}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, address: e.target.value}))}
+                            placeholder="Complete address"
+                            className="w-full"
+                          />
+                        </div>
                       </div>
                     </div>
+
+                    {/* Location Details Section */}
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-green-800 mb-4">Location Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Village *
+                          </label>
+                          <Input
+                            value={newClaimData.village}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, village: e.target.value}))}
+                            placeholder="Village name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Gram Panchayat
+                          </label>
+                          <Input
+                            value={newClaimData.gram_panchayat}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, gram_panchayat: e.target.value}))}
+                            placeholder="Gram Panchayat name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tehsil/Taluk
+                          </label>
+                          <Input
+                            value={newClaimData.tehsil}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, tehsil: e.target.value}))}
+                            placeholder="Tehsil/Taluk name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            District *
+                          </label>
+                          <Input
+                            value={newClaimData.district}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, district: e.target.value}))}
+                            placeholder="District name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            State
+                          </label>
+                          <Input
+                            value={newClaimData.state}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, state: e.target.value}))}
+                            placeholder="State name"
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Forest Land Details Section */}
+                    <div className="bg-amber-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-amber-800 mb-4">Forest Land Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Forest Village Name
+                          </label>
+                          <Input
+                            value={newClaimData.forest_village_name}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, forest_village_name: e.target.value}))}
+                            placeholder="Forest village name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Range
+                          </label>
+                          <Input
+                            value={newClaimData.range}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, range: e.target.value}))}
+                            placeholder="Forest range"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Division
+                          </label>
+                          <Input
+                            value={newClaimData.division}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, division: e.target.value}))}
+                            placeholder="Forest division"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Forest Block
+                          </label>
+                          <Input
+                            value={newClaimData.forest_block}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, forest_block: e.target.value}))}
+                            placeholder="Forest block"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Survey Number *
+                          </label>
+                          <Input
+                            value={newClaimData.survey_number}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, survey_number: e.target.value}))}
+                            placeholder="Survey number"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Khasra Number
+                          </label>
+                          <Input
+                            value={newClaimData.khasra_number}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, khasra_number: e.target.value}))}
+                            placeholder="Khasra number"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Area Claimed (Hectares) *
+                          </label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={newClaimData.area_claimed}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, area_claimed: e.target.value}))}
+                            placeholder="0.00"
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Claim Details Section */}
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-purple-800 mb-4">Claim Details</h4>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Claim Type *
+                          </label>
+                          <Select 
+                            value={newClaimData.claim_type} 
+                            onValueChange={(value) => setNewClaimData(prev => ({...prev, claim_type: value}))}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Individual Forest Rights">Individual Forest Rights (IFR)</SelectItem>
+                              <SelectItem value="Community Forest Rights">Community Forest Rights (CFR)</SelectItem>
+                              <SelectItem value="Development Rights">Development Rights</SelectItem>
+                              <SelectItem value="Community Forest Resource Rights">Community Forest Resource Rights</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Period of Occupation (Years)
+                          </label>
+                          <Input
+                            value={newClaimData.occupation_period}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, occupation_period: e.target.value}))}
+                            placeholder="Number of years in occupation"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Evidence of Occupation
+                          </label>
+                          <Textarea
+                            value={newClaimData.evidence_of_occupation}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, evidence_of_occupation: e.target.value}))}
+                            placeholder="Describe evidence of occupation (e.g., cultivation records, traditional use, etc.)"
+                            className="w-full"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Conditional Fields Based on Form Type */}
+                    {newClaimData.claim_type === 'Community Forest Rights' && (
+                      <div className="bg-indigo-50 p-4 rounded-lg">
+                        <h4 className="text-md font-semibold text-indigo-800 mb-4">🏘️ Community Rights Specific (FORM-B)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Gram Sabha Name *
+                            </label>
+                            <Input
+                              value={newClaimData.gram_sabha_name || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, gram_sabha_name: e.target.value}))}
+                              placeholder="Name of Gram Sabha"
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Total Families
+                            </label>
+                            <Input
+                              type="number"
+                              value={newClaimData.total_families || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, total_families: e.target.value}))}
+                              placeholder="Number of families"
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Community Name
+                            </label>
+                            <Input
+                              value={newClaimData.community_name || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, community_name: e.target.value}))}
+                              placeholder="Name of the community"
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {newClaimData.claim_type === 'Community Forest Resource Rights' && (
+                      <div className="bg-emerald-50 p-4 rounded-lg">
+                        <h4 className="text-md font-semibold text-emerald-800 mb-4">🌿 Resource Rights Specific (FORM-C)</h4>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Resource Type
+                            </label>
+                            <Input
+                              value={newClaimData.resource_type || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, resource_type: e.target.value}))}
+                              placeholder="Type of forest resource (e.g., NTFP, grazing, water)"
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Seasonal Access
+                            </label>
+                            <Input
+                              value={newClaimData.seasonal_access || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, seasonal_access: e.target.value}))}
+                              placeholder="Seasonal access pattern (e.g., April-October)"
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Traditional Use Description
+                            </label>
+                            <Textarea
+                              value={newClaimData.traditional_use || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, traditional_use: e.target.value}))}
+                              placeholder="Describe traditional use patterns and customary practices"
+                              className="w-full"
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
