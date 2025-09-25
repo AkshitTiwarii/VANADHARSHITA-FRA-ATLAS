@@ -1,5 +1,4 @@
 # 🌲 FRA Atlas - Forest Rights Act Implementation
-# 🌲 FRA Atlas - Forest Rights Digital Atlas
 
 ## 🎯 Revolutionary Blockchain-Powered Forest Land Management System
 ## 🚀 **ALL SERVICES ARE WORKING AND UPLOADED TO GITHUB!**
