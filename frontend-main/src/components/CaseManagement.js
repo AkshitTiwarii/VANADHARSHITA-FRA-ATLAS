@@ -1,0 +1,1703 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Textarea } from './ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { 
+  Search, 
+  Filter, 
+  FileText, 
+  Eye, 
+  Edit, 
+  CheckCircle, 
+  XCircle, 
+  Clock,
+  AlertTriangle,
+  AlertCircle,
+  User,
+  MapPin,
+  Calendar,
+  Download,
+  Upload,
+  Bot,
+  MessageSquare,
+  Scan,
+  Image,
+  FileX,
+  Loader2,
+  Camera,
+  RotateCcw,
+  Check,
+  X,
+  Globe
+} from 'lucide-react';
+import axios from 'axios';
+import { useAuth } from '../App';
+import { useTranslation } from '../contexts/LanguageContext';
+import LanguageSelector from './LanguageSelector';
+import { toast } from 'sonner';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const AI_SERVICE_URL = process.env.REACT_APP_AI_SERVICE_URL || 'http://localhost:8000';
+const API = `${BACKEND_URL}/api`;
+
+const CaseManagement = () => {
+  const { t, translateDynamic, currentLanguage, isTranslating } = useTranslation();
+  const [claims, setClaims] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [selectedClaim, setSelectedClaim] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionNotes, setActionNotes] = useState('');
+  const [showOcrDialog, setShowOcrDialog] = useState(false);
+  const [ocrFile, setOcrFile] = useState(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrResult, setOcrResult] = useState(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [aiServiceStatus, setAiServiceStatus] = useState('checking');
+  const [ocrLanguage, setOcrLanguage] = useState('auto'); // For multilingual OCR
+  const [translatedOcrResult, setTranslatedOcrResult] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [newClaimData, setNewClaimData] = useState({
+    // Personal Details
+    claimant_name: '',
+    husband_father_name: '',
+    age: '',
+    address: '',
+    village: '',
+    gram_panchayat: '',
+    tehsil: '',
+    district: '',
+    state: '',
+    // Forest Land Details
+    forest_village_name: '',
+    range: '',
+    division: '',
+    forest_block: '',
+    survey_number: '',
+    khasra_number: '',
+    area_claimed: '',
+    // Claim Details
+    claim_type: 'Individual Forest Rights',
+    occupation_period: '',
+    evidence_of_occupation: '',
+    // Additional Requirements
+    community_certificate: '',
+    residence_proof: '',
+    land_records: ''
+  });
+  const { user } = useAuth();
+
+  useEffect(() => {
+    fetchClaims();
+    checkAiServiceStatus();
+  }, [statusFilter]);
+
+  const checkAiServiceStatus = async () => {
+    try {
+      const response = await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 5000 });
+      if (response.status === 200) {
+        setAiServiceStatus('online');
+      } else {
+        setAiServiceStatus('offline');
+      }
+    } catch (error) {
+      setAiServiceStatus('offline');
+    }
+  };
+
+  const fetchClaims = async () => {
+    try {
+      const params = {};
+      if (statusFilter) params.status = statusFilter;
+      
+      const response = await axios.get(`${API}/claims`, { params });
+      setClaims(response.data);
+    } catch (error) {
+      console.error('Failed to fetch claims:', error);
+      toast.error('Failed to load claims');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredClaims = claims.filter(claim => {
+    const matchesSearch = 
+      (claim.claimant_name || claim.beneficiary_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (claim.village || claim.village_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (claim.claim_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (claim.survey_number || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = !statusFilter || statusFilter === 'all' || claim.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'under_review': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
+      case 'disputed': return 'bg-orange-100 text-orange-800 border-orange-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'approved': return <CheckCircle className="w-4 h-4" />;
+      case 'pending': return <Clock className="w-4 h-4" />;
+      case 'under_review': return <Eye className="w-4 h-4" />;
+      case 'rejected': return <XCircle className="w-4 h-4" />;
+      case 'disputed': return <AlertTriangle className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  const updateClaimStatus = async (claimId, newStatus, notes = '') => {
+    setActionLoading(true);
+    try {
+      await axios.put(`${API}/claims/${claimId}/status`, {
+        status: newStatus,
+        notes: notes
+      });
+      
+      // Refresh claims
+      await fetchClaims();
+      setSelectedClaim(null);
+      setActionNotes('');
+      toast.success(`Claim ${newStatus} successfully`);
+    } catch (error) {
+      console.error('Failed to update claim status:', error);
+      toast.error('Failed to update claim status');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const canTakeAction = (claim) => {
+    return ['admin', 'officer'].includes(user?.role) && 
+           ['pending', 'under_review'].includes(claim.status);
+  };
+
+  // OCR Functions
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    console.log('File selected:', file);
+    
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+          toast.error('File size too large. Please select a file smaller than 10MB.');
+          return;
+        }
+        setOcrFile(file);
+        setOcrResult(null);
+        toast.success(`File "${file.name}" selected successfully!`);
+      } else {
+        toast.error('Please select a valid image file (PNG, JPG, JPEG)');
+      }
+    }
+    
+    // Reset the input value to allow selecting the same file again
+    event.target.value = '';
+  };
+
+  const processDocument = async () => {
+    if (!ocrFile) {
+      toast.error(t('selectDocumentFirst') || 'Please select a document image first');
+      return;
+    }
+
+    setOcrLoading(true);
+    toast.info(t('processingDocument') || 'Processing document with AI... This may take a few seconds.');
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', ocrFile);
+      formData.append('language', ocrLanguage);
+      formData.append('target_language', currentLanguage);
+
+      // Call AI service
+      const response = await axios.post(`${AI_SERVICE_URL}/api/process-document`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000, // 30 second timeout
+      });
+
+      if (response.data.success) {
+        setOcrResult(response.data);
+        
+        // Translate OCR results if needed
+        if (currentLanguage !== 'en' && response.data.extracted_text) {
+          try {
+            const translatedText = await translateDynamic(response.data.extracted_text, currentLanguage);
+            setTranslatedOcrResult({
+              ...response.data,
+              extracted_text: translatedText,
+              original_text: response.data.extracted_text
+            });
+          } catch (translationError) {
+            console.error('Translation failed:', translationError);
+            setTranslatedOcrResult(null);
+          }
+        } else {
+          setTranslatedOcrResult(null);
+        }
+        
+        // Auto-fill form with extracted data
+        const entities = response.data.entities;
+        const fieldsUpdated = [];
+        
+        const updatedData = { ...newClaimData };
+        
+        if (entities.holder_name || entities.claimant_name || entities.name) {
+          updatedData.claimant_name = entities.holder_name || entities.claimant_name || entities.name;
+          fieldsUpdated.push('Claimant Name');
+        }
+        if (entities.father_name || entities.husband_name) {
+          updatedData.husband_father_name = entities.father_name || entities.husband_name;
+          fieldsUpdated.push('Husband/Father Name');
+        }
+        if (entities.age) {
+          updatedData.age = entities.age;
+          fieldsUpdated.push('Age');
+        }
+        if (entities.address) {
+          updatedData.address = entities.address;
+          fieldsUpdated.push('Address');
+        }
+        if (entities.village) {
+          updatedData.village = entities.village;
+          fieldsUpdated.push('Village');
+        }
+        if (entities.gram_panchayat || entities.panchayat) {
+          updatedData.gram_panchayat = entities.gram_panchayat || entities.panchayat;
+          fieldsUpdated.push('Gram Panchayat');
+        }
+        if (entities.tehsil || entities.taluk) {
+          updatedData.tehsil = entities.tehsil || entities.taluk;
+          fieldsUpdated.push('Tehsil');
+        }
+        if (entities.district) {
+          updatedData.district = entities.district;
+          fieldsUpdated.push('District');
+        }
+        if (entities.state) {
+          updatedData.state = entities.state;
+          fieldsUpdated.push('State');
+        }
+        if (entities.forest_village) {
+          updatedData.forest_village_name = entities.forest_village;
+          fieldsUpdated.push('Forest Village');
+        }
+        if (entities.range) {
+          updatedData.range = entities.range;
+          fieldsUpdated.push('Range');
+        }
+        if (entities.division) {
+          updatedData.division = entities.division;
+          fieldsUpdated.push('Division');
+        }
+        if (entities.survey_number || entities.survey_no) {
+          updatedData.survey_number = entities.survey_number || entities.survey_no;
+          fieldsUpdated.push('Survey Number');
+        }
+        if (entities.khasra_number || entities.khasra_no) {
+          updatedData.khasra_number = entities.khasra_number || entities.khasra_no;
+          fieldsUpdated.push('Khasra Number');
+        }
+        if (entities.area || entities.area_claimed) {
+          updatedData.area_claimed = entities.area || entities.area_claimed;
+          fieldsUpdated.push('Area Claimed');
+        }
+        if (entities.survey_number) {
+          updatedData.survey_number = entities.survey_number;
+          fieldsUpdated.push('Survey Number');
+        }
+        
+        setNewClaimData(updatedData);
+
+        const confidence = response.data.validation?.confidence || 0;
+        const formType = response.data.form_type || 'Unknown';
+        const formConfidence = response.data.form_detection_confidence || 0;
+        
+        // Show form detection results
+        if (formType !== 'Unknown' && formConfidence > 0.3) {
+          toast.info(`📋 Detected: ${formType} (${(formConfidence * 100).toFixed(1)}% confidence)`);
+        }
+        
+        const message = fieldsUpdated.length > 0 
+          ? `✅ Document processed successfully! 
+             🎯 Confidence: ${confidence.toFixed(1)}%
+             📝 Updated: ${fieldsUpdated.join(', ')}`
+          : `⚠️ Document processed but no fields could be extracted. Please fill manually.`;
+        
+        toast.success(message);
+      } else {
+        throw new Error(response.data.message || 'Failed to process document');
+      }
+    } catch (error) {
+      console.error('OCR processing error:', error);
+      
+      if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        toast.error('❌ AI Service not running! Please start the AI service on port 8000.');
+      } else if (error.response?.status === 422) {
+        toast.error('📷 Could not extract text from image. Please ensure the document is clear and readable.');
+      } else if (error.response?.status === 400) {
+        toast.error('📄 Invalid file type. Please upload JPG, PNG, or TIFF images.');
+      } else {
+        toast.error(`❌ Processing failed: ${error.response?.data?.detail || error.message}`);
+      }
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // Camera Functions
+  const startCamera = async () => {
+    try {
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error('Camera not supported by this browser');
+        return;
+      }
+
+      console.log('Requesting camera access...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',  // Use back camera on mobile
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
+      
+      console.log('Camera stream obtained:', stream);
+      setCameraStream(stream);
+      setShowCamera(true);
+      
+      // Wait for video element to be available
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(error => {
+            console.error('Error playing video:', error);
+          });
+        }
+      }, 100);
+      
+      toast.success('Camera started successfully');
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      let errorMessage = 'Unable to access camera';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Camera access denied. Please allow camera permissions.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'No camera found on this device.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = 'Camera not supported by this browser.';
+      }
+      
+      toast.error(errorMessage);
+      setShowCamera(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw current video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Convert canvas to blob
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `document-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        setOcrFile(file);
+        stopCamera();
+        toast.success('Photo captured! Ready for processing.');
+      }
+    }, 'image/jpeg', 0.8);
+  };
+
+  const submitNewClaim = async () => {
+    try {
+      const claimData = {
+        ...newClaimData,
+        submitted_date: new Date().toISOString(),
+        status: 'pending',
+        latitude: ocrResult?.entities?.coordinates?.[0] || 21.2514,
+        longitude: ocrResult?.entities?.coordinates?.[1] || 81.6296,
+        document_hash: ocrResult?.document_hash,
+        ai_processed: ocrResult ? true : false
+      };
+
+      await axios.post(`${API}/claims`, claimData);
+      
+      // Refresh claims list
+      await fetchClaims();
+      
+      // Reset form
+      setNewClaimData({
+        beneficiary_name: '',
+        father_name: '',
+        village: '',
+        district: '',
+        area_claimed: '',
+        survey_number: '',
+        claim_type: 'Individual Forest Rights'
+      });
+      setOcrFile(null);
+      setOcrResult(null);
+      setShowOcrDialog(false);
+      
+      toast.success('New claim submitted successfully');
+    } catch (error) {
+      console.error('Failed to submit claim:', error);
+      toast.error('Failed to submit claim');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
+          <p className="mt-2 text-slate-600">Loading cases...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-blue-900">Case Management</h1>
+          <p className="text-slate-600">Manage forest rights claims and applications</p>
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+          <Button variant="outline" size="sm">
+            <Upload className="w-4 h-4 mr-2" />
+            Bulk Import
+          </Button>
+          <Button 
+            size="sm" 
+            className="bg-purple-600 hover:bg-purple-700"
+            onClick={() => setShowOcrDialog(true)}
+          >
+            <Scan className="w-4 h-4 mr-2" />
+            OCR Scan
+          </Button>
+          <Dialog open={showOcrDialog} onOpenChange={setShowOcrDialog}>
+            <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
+              <DialogHeader className="border-b pb-4 mb-6">
+                <DialogTitle className="flex items-center justify-between text-xl">
+                  <div className="flex items-center">
+                    <Bot className="w-6 h-6 mr-3 text-purple-600" />
+                    AI-Powered Document Processing
+                  </div>
+                  <div className="flex items-center text-sm">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                      aiServiceStatus === 'online' ? 'bg-green-500' : 
+                      aiServiceStatus === 'offline' ? 'bg-red-500' : 'bg-yellow-500'
+                    }`}></div>
+                    <span className={`${
+                      aiServiceStatus === 'online' ? 'text-green-600' : 
+                      aiServiceStatus === 'offline' ? 'text-red-600' : 'text-yellow-600'
+                    }`}>
+                      AI Service: {aiServiceStatus === 'online' ? 'Ready' : 
+                                  aiServiceStatus === 'offline' ? 'Offline' : 'Checking...'}
+                    </span>
+                  </div>
+                </DialogTitle>
+                <DialogDescription className="text-gray-600 mt-2">
+                  Upload a document image or use your camera to extract information using OCR and NLP
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {/* Document Upload Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">{t('documentProcessing') || 'Document Processing'}</h3>
+                    <div className="flex items-center space-x-3">
+                      <LanguageSelector />
+                    </div>
+                  </div>
+
+                  {/* OCR Language Selection */}
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <h4 className="text-sm font-semibold text-purple-800 mb-3 flex items-center">
+                      <Globe className="w-4 h-4 mr-2" />
+                      {t('ocrLanguageSettings') || 'OCR Language Settings'}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-2">
+                          {t('documentLanguage') || 'Document Language:'}
+                        </label>
+                        <Select value={ocrLanguage} onValueChange={setOcrLanguage}>
+                          <SelectTrigger className="bg-white border-purple-300">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">🤖 Auto-detect</SelectItem>
+                            <SelectItem value="eng">🇬🇧 English</SelectItem>
+                            <SelectItem value="hin">🇮🇳 Hindi (हिन्दी)</SelectItem>
+                            <SelectItem value="ori">🏛️ Odia (ଓଡ଼ିଆ)</SelectItem>
+                            <SelectItem value="tel">🏛️ Telugu (తెలుగు)</SelectItem>
+                            <SelectItem value="ben">🏛️ Bengali (বাংলা)</SelectItem>
+                            <SelectItem value="san">🌿 Sanskrit</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-2">
+                          {t('targetLanguage') || 'Target Language:'}
+                        </label>
+                        <div className="bg-white border border-purple-300 rounded-md px-3 py-2 text-sm">
+                          {currentLanguage === 'en' ? '🇬🇧 English' :
+                           currentLanguage === 'hi' ? '🇮🇳 Hindi' :
+                           currentLanguage === 'or' ? '🏛️ Odia' :
+                           currentLanguage === 'te' ? '🏛️ Telugu' :
+                           currentLanguage === 'bn' ? '🏛️ Bengali' :
+                           currentLanguage === 'sat' ? '🌿 Santali' :
+                           currentLanguage === 'gon' ? '🌿 Gondi' :
+                           currentLanguage === 'kok' ? '🌿 Kokborok' :
+                           'Current Language'}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-purple-600 mt-2">
+                      💡 {t('ocrLanguageHint') || 'Documents will be translated to your current interface language automatically'}
+                    </p>
+                  </div>
+                  
+                  {/* Form Type Selection */}
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Expected Form Type (Optional)
+                    </h4>
+                    <Select value={newClaimData.claim_type} onValueChange={(value) => setNewClaimData(prev => ({...prev, claim_type: value}))}>
+                      <SelectTrigger className="w-full bg-white">
+                        <SelectValue placeholder="Auto-detect or select form type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Individual Forest Rights">📋 FORM-A: Individual Forest Rights (IFR)</SelectItem>
+                        <SelectItem value="Community Forest Rights">🏘️ FORM-B: Community Forest Rights (CFR)</SelectItem>
+                        <SelectItem value="Community Forest Resource Rights">🌿 FORM-C: Community Forest Resource Rights</SelectItem>
+                        <SelectItem value="Development Rights">🚧 Development Rights</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-blue-600 mt-2">
+                      💡 Our AI will auto-detect the form type, but you can pre-select if known
+                    </p>
+                  </div>
+
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50">
+                    {!showCamera ? (
+                      <>
+                        <Image className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-xl font-medium text-gray-700 mb-2">
+                              Upload or Capture Document
+                            </h4>
+                            <p className="text-sm text-gray-500">
+                              PNG, JPG files up to 10MB
+                            </p>
+                          </div>
+                          
+                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <div className="relative">
+                              <input
+                                id="document-upload"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileSelect}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              />
+                              <Button variant="outline" size="lg" className="w-full sm:w-auto relative">
+                                <Upload className="w-5 h-5 mr-2" />
+                                Upload File
+                              </Button>
+                            </div>
+                            
+                            <Button 
+                              onClick={startCamera}
+                              variant="outline"
+                              size="lg"
+                              className="w-full sm:w-auto bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                            >
+                              <Camera className="w-5 h-5 mr-2" />
+                              Use Camera
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-4">
+                        <h4 className="text-lg font-semibold text-gray-800 mb-4">Camera View</h4>
+                        <div className="relative bg-black rounded-lg overflow-hidden">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full max-w-md mx-auto rounded-lg"
+                            style={{ maxHeight: '300px' }}
+                          />
+                          <div className="absolute inset-2 border-2 border-dashed border-purple-400 rounded-lg pointer-events-none opacity-50"></div>
+                        </div>
+                        
+                        <div className="flex justify-center space-x-3">
+                          <Button onClick={capturePhoto} size="lg" className="bg-purple-600 hover:bg-purple-700">
+                            <Camera className="w-5 h-5 mr-2" />
+                            Capture Photo
+                          </Button>
+                          <Button onClick={stopCamera} variant="outline" size="lg">
+                            <X className="w-5 h-5 mr-2" />
+                            Cancel
+                          </Button>
+                        </div>
+                        
+                        <p className="text-sm text-purple-600 bg-purple-50 p-3 rounded-lg">
+                          📋 Position the document within the frame and click "Capture Photo"
+                        </p>
+                      </div>
+                    )}
+                    
+                    <canvas ref={canvasRef} className="hidden" />
+                    
+                    {ocrFile && (
+                      <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                        <div className="flex items-center justify-center mb-3">
+                          <Image className="w-6 h-6 mr-3 text-blue-600" />
+                          <div>
+                            <p className="text-sm font-medium text-blue-900">
+                              {ocrFile.name || 'Captured Image'}
+                            </p>
+                            <p className="text-xs text-blue-600">
+                              {ocrFile.size ? `${(ocrFile.size / 1024 / 1024).toFixed(2)} MB` : 'Ready for processing'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-3 justify-center">
+                          <Button
+                            onClick={processDocument}
+                            disabled={ocrLoading}
+                            className="bg-purple-600 hover:bg-purple-700"
+                            size="lg"
+                          >
+                            {ocrLoading ? (
+                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            ) : (
+                              <Bot className="w-5 h-5 mr-2" />
+                            )}
+                            {ocrLoading ? 'Processing with AI...' : 'Process with AI'}
+                          </Button>
+                          <Button
+                            onClick={() => setOcrFile(null)}
+                            variant="outline"
+                            size="lg"
+                          >
+                            <RotateCcw className="w-5 h-5 mr-2" />
+                            Reset
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Enhanced OCR Results */}
+                  {ocrResult && (
+                    <div className="mt-6 space-y-4">
+                      <div className="flex items-center mb-3">
+                        <Bot className="w-5 h-5 mr-2 text-green-600" />
+                        <h4 className="font-semibold text-green-800">AI Processing Complete ✨</h4>
+                        <span className="ml-auto bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                          {Math.round(ocrResult.confidence_score * 100)}% confidence
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <h5 className="font-medium mb-2 text-gray-800 flex items-center">
+                            <FileText className="w-4 h-4 mr-2" />
+                            {t('extractedText') || 'Extracted Text'}
+                          </h5>
+                          
+                          {/* Translated Text (if available) */}
+                          {translatedOcrResult && currentLanguage !== 'en' && (
+                            <div className="mb-3">
+                              <div className="flex items-center mb-2">
+                                <Globe className="w-3 h-3 mr-1 text-blue-600" />
+                                <span className="text-xs font-medium text-blue-700">
+                                  {t('translatedTo') || 'Translated to'} {currentLanguage.toUpperCase()}
+                                  {isTranslating && <Loader2 className="w-3 h-3 ml-1 animate-spin inline" />}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-700 max-h-24 overflow-y-auto bg-blue-50 p-2 rounded border border-blue-200">
+                                {translatedOcrResult.extracted_text || t('translationInProgress') || 'Translation in progress...'}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Original Text */}
+                          <div>
+                            {translatedOcrResult && (
+                              <div className="flex items-center mb-2">
+                                <span className="text-xs font-medium text-gray-600">
+                                  {t('originalText') || 'Original Text'}
+                                </span>
+                              </div>
+                            )}
+                            <div className="text-sm text-gray-600 max-h-32 overflow-y-auto bg-white p-2 rounded border">
+                              {ocrResult.extracted_text || t('noTextExtracted') || 'No text extracted'}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-xs text-gray-500">
+                              {t('detectedLanguage') || 'Language'}: {ocrResult.language_detected || 'Auto-detected'}
+                            </p>
+                            {translatedOcrResult && (
+                              <Button
+                                variant="ghost" 
+                                size="sm"
+                                className="text-xs p-1 h-6"
+                                onClick={() => setTranslatedOcrResult(null)}
+                              >
+                                {t('showOriginalOnly') || 'Show Original Only'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <h5 className="font-medium mb-2 text-blue-800 flex items-center">
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Key Information
+                          </h5>
+                          <div className="space-y-1 text-sm">
+                            {ocrResult.entities && ocrResult.entities.length > 0 ? (
+                              ocrResult.entities.map((entity, idx) => (
+                                <div key={idx} className="flex justify-between bg-white p-2 rounded border">
+                                  <span className="font-medium text-blue-700">{entity.label}:</span>
+                                  <span className="text-blue-600">{entity.text}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-blue-600 italic bg-white p-2 rounded border">
+                                🔍 Processing entities...
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {ocrResult.coordinates && (
+                        <div className="bg-green-50 p-4 rounded-lg">
+                          <h5 className="font-medium mb-2 text-green-800 flex items-center">
+                            <Globe className="w-4 h-4 mr-2" />
+                            Location & Forest Analysis
+                          </h5>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                            <div className="bg-white p-3 rounded border">
+                              <span className="font-medium text-green-700 block">Coordinates:</span>
+                              <p className="text-green-600 font-mono">
+                                {ocrResult.coordinates.lat.toFixed(6)}, {ocrResult.coordinates.lng.toFixed(6)}
+                              </p>
+                            </div>
+                            <div className="bg-white p-3 rounded border">
+                              <span className="font-medium text-green-700 block">Forest Cover:</span>
+                              <p className="text-green-600 font-semibold">
+                                {ocrResult.forest_analysis?.cover_percentage || 'Analyzing...'}
+                              </p>
+                            </div>
+                            <div className="bg-white p-3 rounded border">
+                              <span className="font-medium text-green-700 block">Risk Level:</span>
+                              <p className="text-green-600 font-semibold">
+                                {ocrResult.risk_assessment || 'Computing...'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Blockchain Verification Status */}
+                      {ocrResult.blockchain_verification && (
+                        <div className={`p-4 rounded-lg border-l-4 ${
+                          ocrResult.blockchain_verification.success && !ocrResult.blockchain_verification.error 
+                            ? 'bg-emerald-50 border-emerald-400' 
+                            : 'bg-amber-50 border-amber-400'
+                        }`}>
+                          <h5 className="font-medium mb-2 flex items-center">
+                            {ocrResult.blockchain_verification.success && !ocrResult.blockchain_verification.error ? (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
+                                <span className="text-emerald-800">🔗 Blockchain Verified</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-4 h-4 mr-2 text-amber-600" />
+                                <span className="text-amber-800">⚠️ Verification Pending</span>
+                              </>
+                            )}
+                          </h5>
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            {ocrResult.blockchain_verification.transactionId && (
+                              <div className="bg-white p-3 rounded border">
+                                <span className="font-medium text-gray-700 block">Transaction ID:</span>
+                                <p className="font-mono text-xs text-blue-600 break-all">
+                                  {ocrResult.blockchain_verification.transactionId}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {ocrResult.blockchain_verification.blockNumber && (
+                              <div className="bg-white p-3 rounded border">
+                                <span className="font-medium text-gray-700 block">Block Number:</span>
+                                <p className="text-green-600 font-semibold">
+                                  #{ocrResult.blockchain_verification.blockNumber}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {ocrResult.blockchain_verification.documentHash && (
+                              <div className="bg-white p-3 rounded border sm:col-span-2">
+                                <span className="font-medium text-gray-700 block">Document Hash:</span>
+                                <p className="font-mono text-xs text-purple-600 break-all">
+                                  {ocrResult.blockchain_verification.documentHash}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {ocrResult.blockchain_verification.network && (
+                              <div className="bg-white p-3 rounded border">
+                                <span className="font-medium text-gray-700 block">Network:</span>
+                                <p className="text-blue-600">
+                                  {ocrResult.blockchain_verification.network}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {ocrResult.blockchain_verification.timestamp && (
+                              <div className="bg-white p-3 rounded border">
+                                <span className="font-medium text-gray-700 block">Verified At:</span>
+                                <p className="text-gray-600 text-xs">
+                                  {new Date(ocrResult.blockchain_verification.timestamp).toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {ocrResult.blockchain_verification.immutable && (
+                            <div className="mt-3 p-2 bg-white rounded border flex items-center">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                              <span className="text-xs text-green-700 font-medium">
+                                🛡️ Immutable record - Cannot be altered or deleted
+                              </span>
+                            </div>
+                          )}
+                          
+                          {ocrResult.blockchain_verification.error && (
+                            <div className="mt-3 p-2 bg-amber-100 border border-amber-300 rounded">
+                              <span className="text-xs text-amber-700">
+                                ⚠️ {ocrResult.blockchain_verification.error}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                        <div className="flex space-x-2">
+                          <Button
+                            onClick={() => {
+                              // Auto-fill the form with extracted data
+                              setNewClaimData(prev => ({
+                                ...prev,
+                                beneficiary_name: ocrResult.beneficiary_name || prev.beneficiary_name,
+                                land_area: ocrResult.land_area || prev.land_area,
+                                location_details: ocrResult.extracted_text || prev.location_details,
+                                coordinates: ocrResult.coordinates || prev.coordinates
+                              }));
+                              setShowOcrDialog(false);
+                            }}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Auto-Fill Form
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              // Download extracted data as JSON
+                              const dataStr = JSON.stringify(ocrResult, null, 2);
+                              const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                              const exportFileDefaultName = `ocr_result_${Date.now()}.json`;
+                              const linkElement = document.createElement('a');
+                              linkElement.setAttribute('href', dataUri);
+                              linkElement.setAttribute('download', exportFileDefaultName);
+                              linkElement.click();
+                            }}
+                            variant="outline"
+                            className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Data
+                          </Button>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            setOcrResult(null);
+                            setOcrFile(null);
+                          }}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Process Another
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Auto-filled Form */}
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">New Claim Form</h3>
+                  
+                  <div className="grid grid-cols-1 gap-8">
+                    {/* Personal Details Section */}
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-blue-800 mb-4">Personal Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Claimant Name *
+                          </label>
+                          <Input
+                            value={newClaimData.claimant_name}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, claimant_name: e.target.value}))}
+                            placeholder="Enter claimant name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Husband/Father's Name *
+                          </label>
+                          <Input
+                            value={newClaimData.husband_father_name}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, husband_father_name: e.target.value}))}
+                            placeholder="Enter husband/father's name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Age
+                          </label>
+                          <Input
+                            type="number"
+                            value={newClaimData.age}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, age: e.target.value}))}
+                            placeholder="Enter age"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Address
+                          </label>
+                          <Input
+                            value={newClaimData.address}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, address: e.target.value}))}
+                            placeholder="Complete address"
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Location Details Section */}
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-green-800 mb-4">Location Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Village *
+                          </label>
+                          <Input
+                            value={newClaimData.village}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, village: e.target.value}))}
+                            placeholder="Village name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Gram Panchayat
+                          </label>
+                          <Input
+                            value={newClaimData.gram_panchayat}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, gram_panchayat: e.target.value}))}
+                            placeholder="Gram Panchayat name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tehsil/Taluk
+                          </label>
+                          <Input
+                            value={newClaimData.tehsil}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, tehsil: e.target.value}))}
+                            placeholder="Tehsil/Taluk name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            District *
+                          </label>
+                          <Input
+                            value={newClaimData.district}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, district: e.target.value}))}
+                            placeholder="District name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            State
+                          </label>
+                          <Input
+                            value={newClaimData.state}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, state: e.target.value}))}
+                            placeholder="State name"
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Forest Land Details Section */}
+                    <div className="bg-amber-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-amber-800 mb-4">Forest Land Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Forest Village Name
+                          </label>
+                          <Input
+                            value={newClaimData.forest_village_name}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, forest_village_name: e.target.value}))}
+                            placeholder="Forest village name"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Range
+                          </label>
+                          <Input
+                            value={newClaimData.range}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, range: e.target.value}))}
+                            placeholder="Forest range"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Division
+                          </label>
+                          <Input
+                            value={newClaimData.division}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, division: e.target.value}))}
+                            placeholder="Forest division"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Forest Block
+                          </label>
+                          <Input
+                            value={newClaimData.forest_block}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, forest_block: e.target.value}))}
+                            placeholder="Forest block"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Survey Number *
+                          </label>
+                          <Input
+                            value={newClaimData.survey_number}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, survey_number: e.target.value}))}
+                            placeholder="Survey number"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Khasra Number
+                          </label>
+                          <Input
+                            value={newClaimData.khasra_number}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, khasra_number: e.target.value}))}
+                            placeholder="Khasra number"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Area Claimed (Hectares) *
+                          </label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={newClaimData.area_claimed}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, area_claimed: e.target.value}))}
+                            placeholder="0.00"
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Claim Details Section */}
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <h4 className="text-md font-semibold text-purple-800 mb-4">Claim Details</h4>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Claim Type *
+                          </label>
+                          <Select 
+                            value={newClaimData.claim_type} 
+                            onValueChange={(value) => setNewClaimData(prev => ({...prev, claim_type: value}))}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Individual Forest Rights">Individual Forest Rights (IFR)</SelectItem>
+                              <SelectItem value="Community Forest Rights">Community Forest Rights (CFR)</SelectItem>
+                              <SelectItem value="Development Rights">Development Rights</SelectItem>
+                              <SelectItem value="Community Forest Resource Rights">Community Forest Resource Rights</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Period of Occupation (Years)
+                          </label>
+                          <Input
+                            value={newClaimData.occupation_period}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, occupation_period: e.target.value}))}
+                            placeholder="Number of years in occupation"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Evidence of Occupation
+                          </label>
+                          <Textarea
+                            value={newClaimData.evidence_of_occupation}
+                            onChange={(e) => setNewClaimData(prev => ({...prev, evidence_of_occupation: e.target.value}))}
+                            placeholder="Describe evidence of occupation (e.g., cultivation records, traditional use, etc.)"
+                            className="w-full"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Conditional Fields Based on Form Type */}
+                    {newClaimData.claim_type === 'Community Forest Rights' && (
+                      <div className="bg-indigo-50 p-4 rounded-lg">
+                        <h4 className="text-md font-semibold text-indigo-800 mb-4">🏘️ Community Rights Specific (FORM-B)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Gram Sabha Name *
+                            </label>
+                            <Input
+                              value={newClaimData.gram_sabha_name || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, gram_sabha_name: e.target.value}))}
+                              placeholder="Name of Gram Sabha"
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Total Families
+                            </label>
+                            <Input
+                              type="number"
+                              value={newClaimData.total_families || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, total_families: e.target.value}))}
+                              placeholder="Number of families"
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Community Name
+                            </label>
+                            <Input
+                              value={newClaimData.community_name || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, community_name: e.target.value}))}
+                              placeholder="Name of the community"
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {newClaimData.claim_type === 'Community Forest Resource Rights' && (
+                      <div className="bg-emerald-50 p-4 rounded-lg">
+                        <h4 className="text-md font-semibold text-emerald-800 mb-4">🌿 Resource Rights Specific (FORM-C)</h4>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Resource Type
+                            </label>
+                            <Input
+                              value={newClaimData.resource_type || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, resource_type: e.target.value}))}
+                              placeholder="Type of forest resource (e.g., NTFP, grazing, water)"
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Seasonal Access
+                            </label>
+                            <Input
+                              value={newClaimData.seasonal_access || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, seasonal_access: e.target.value}))}
+                              placeholder="Seasonal access pattern (e.g., April-October)"
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Traditional Use Description
+                            </label>
+                            <Textarea
+                              value={newClaimData.traditional_use || ''}
+                              onChange={(e) => setNewClaimData(prev => ({...prev, traditional_use: e.target.value}))}
+                              placeholder="Describe traditional use patterns and customary practices"
+                              className="w-full"
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Claim Type
+                      </label>
+                      <Select 
+                        value={newClaimData.claim_type} 
+                        onValueChange={(value) => setNewClaimData(prev => ({...prev, claim_type: value}))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Individual Forest Rights">Individual Forest Rights</SelectItem>
+                          <SelectItem value="Community Forest Rights">Community Forest Rights</SelectItem>
+                          <SelectItem value="Development Rights">Development Rights</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 pt-6 border-t">
+                    <Button variant="outline" size="lg" onClick={() => setShowOcrDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={submitNewClaim}
+                      className="bg-green-600 hover:bg-green-700"
+                      size="lg"
+                    >
+                      <FileText className="w-5 h-5 mr-2" />
+                      Submit Claim
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Search by beneficiary name, village, or claim number..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="w-full md:w-48">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="under_review">Under Review</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="disputed">Disputed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {['pending', 'under_review', 'approved', 'rejected', 'disputed'].map(status => {
+          const count = claims.filter(c => c.status === status).length;
+          return (
+            <Card key={status} className="text-center">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-center mb-2">
+                  {getStatusIcon(status)}
+                </div>
+                <p className="text-2xl font-bold text-slate-900">{count}</p>
+                <p className="text-sm text-slate-600 capitalize">
+                  {status.replace('_', ' ')}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Claims List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <FileText className="w-5 h-5 text-blue-600" />
+            <span>Forest Rights Claims ({filteredClaims.length})</span>
+          </CardTitle>
+          <CardDescription>Click on any claim to view details and take actions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {filteredClaims.length > 0 ? (
+            <div className="space-y-4">
+              {filteredClaims.map((claim) => (
+                <div 
+                  key={claim.id} 
+                  className="border rounded-lg p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                  onClick={() => setSelectedClaim(claim)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <FileText className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-slate-900">{claim.beneficiary_name}</h4>
+                        <p className="text-sm text-slate-600">{claim.village_name} | {claim.claim_type}</p>
+                        <p className="text-xs text-slate-500">
+                          Claim #{claim.claim_number} | Area: {claim.area_claimed} ha
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <Badge className={`${getStatusColor(claim.status)} mb-2`}>
+                        <div className="flex items-center space-x-1">
+                          {getStatusIcon(claim.status)}
+                          <span>{claim.status.replace('_', ' ').toUpperCase()}</span>
+                        </div>
+                      </Badge>
+                      <p className="text-xs text-slate-500">
+                        Submitted: {new Date(claim.submitted_date).toLocaleDateString('en-IN')}
+                      </p>
+                      {claim.ai_recommendation && (
+                        <div className="flex items-center space-x-1 mt-1">
+                          <Bot className="w-3 h-3 text-purple-600" />
+                          <span className="text-xs text-purple-600">
+                            AI: {claim.ai_recommendation.decision} ({Math.round(claim.ai_recommendation.confidence * 100)}%)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-600">No claims found matching your criteria</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Claim Details Dialog */}
+      {selectedClaim && (
+        <Dialog open={!!selectedClaim} onOpenChange={() => setSelectedClaim(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                <span>Claim Details - {selectedClaim.beneficiary_name}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Claim #{selectedClaim.claim_number} | {selectedClaim.village_name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <User className="w-5 h-5 mr-2 text-blue-600" />
+                      Beneficiary Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Name:</span>
+                      <span className="font-medium">{selectedClaim.beneficiary_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Father's Name:</span>
+                      <span className="font-medium">{selectedClaim.beneficiary_father_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Claim Type:</span>
+                      <Badge variant="outline">{selectedClaim.claim_type}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Area Claimed:</span>
+                      <span className="font-medium">{selectedClaim.area_claimed} hectares</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <MapPin className="w-5 h-5 mr-2 text-blue-600" />
+                      Location Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Village:</span>
+                      <span className="font-medium">{selectedClaim.village_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Status:</span>
+                      <Badge className={getStatusColor(selectedClaim.status)}>
+                        {selectedClaim.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Submitted:</span>
+                      <span className="font-medium">
+                        {new Date(selectedClaim.submitted_date).toLocaleDateString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Last Updated:</span>
+                      <span className="font-medium">
+                        {new Date(selectedClaim.last_updated).toLocaleDateString('en-IN')}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* AI Recommendation */}
+              {selectedClaim.ai_recommendation && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <Bot className="w-5 h-5 mr-2 text-purple-600" />
+                      AI Recommendation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="font-medium text-lg">
+                          Recommendation: 
+                          <span className={`ml-2 ${
+                            selectedClaim.ai_recommendation.decision === 'approve' ? 'text-green-600' : 'text-yellow-600'
+                          }`}>
+                            {selectedClaim.ai_recommendation.decision.toUpperCase()}
+                          </span>
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          Confidence: {Math.round(selectedClaim.ai_recommendation.confidence * 100)}%
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {selectedClaim.ai_recommendation.reasons && (
+                      <div>
+                        <h4 className="font-medium mb-2">Supporting Reasons:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-slate-600">
+                          {selectedClaim.ai_recommendation.reasons.map((reason, index) => (
+                            <li key={index}>{reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Linked Schemes */}
+              {selectedClaim.linked_schemes.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Linked Government Schemes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedClaim.linked_schemes.map((scheme, index) => (
+                        <Badge key={index} variant="secondary" className="bg-green-100 text-green-800">
+                          {scheme}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Actions */}
+              {canTakeAction(selectedClaim) && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Take Action</CardTitle>
+                    <CardDescription>Review and update the status of this claim</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Textarea
+                      placeholder="Add notes or comments..."
+                      value={actionNotes}
+                      onChange={(e) => setActionNotes(e.target.value)}
+                      className="min-h-[100px]"
+                    />
+                    
+                    <div className="flex space-x-3">
+                      <Button
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => updateClaimStatus(selectedClaim.id, 'approved', actionNotes)}
+                        disabled={actionLoading}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Approve
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                        onClick={() => updateClaimStatus(selectedClaim.id, 'under_review', actionNotes)}
+                        disabled={actionLoading}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Mark for Review
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        className="border-red-600 text-red-600 hover:bg-red-50"
+                        onClick={() => updateClaimStatus(selectedClaim.id, 'rejected', actionNotes)}
+                        disabled={actionLoading}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Reject
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+};
+
+export default CaseManagement;
