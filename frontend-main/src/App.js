@@ -130,12 +130,11 @@ function App() {
         <Router>
           <div className="App">
             <Routes>
+              {/* Public Routes - No login required */}
+              <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Home />
-                </ProtectedRoute>
-              } />
+              
+              {/* Protected Routes - Login required */}
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <MainLayout>
