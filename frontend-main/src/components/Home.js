@@ -226,7 +226,7 @@ const Home = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center">
               <button
-                onClick={() => navigate('/cases')}
+                onClick={() => navigate('/login')}
                 className="group px-10 py-5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-2xl hover:shadow-orange-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-orange-400/50"
               >
                 <span>🚀</span>
@@ -234,7 +234,7 @@ const Home = () => {
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                onClick={() => navigate('/atlas')}
+                onClick={() => navigate('/citizen-portal')}
                 className="group px-10 py-5 bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-teal-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-teal-400/50 backdrop-blur-sm"
               >
                 <span>🗺️</span>
@@ -524,14 +524,14 @@ const Home = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <button
-              onClick={() => navigate('/cases')}
+              onClick={() => navigate('/login')}
               className="group px-12 py-5 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black rounded-2xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-yellow-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-yellow-300/50"
             >
               <span>⚡</span>
               {t('startManagingCases')}
             </button>
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/login')}
               className="group px-12 py-5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-purple-400/50 backdrop-blur-sm"
             >
               <span>📊</span>
