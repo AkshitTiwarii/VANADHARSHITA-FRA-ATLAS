@@ -1,0 +1,94 @@
+{
+  "short_name": "FRA Portal",
+  "name": "Forest Rights Act Portal",
+  "description": "Digital platform for managing Forest Rights Act claims and village data with multilingual support and geospatial integration",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#f8fafc",
+  "orientation": "portrait",
+  "scope": "/",
+  "categories": ["government", "productivity", "utilities"],
+  "lang": "en-IN",
+  "dir": "ltr",
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-home.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "FRA Portal Home Page"
+    },
+    {
+      "src": "/screenshots/mobile-dashboard.png",
+      "sizes": "360x640",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile Dashboard"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Citizen Portal",
+      "short_name": "Citizen",
+      "description": "Access citizen services for filing and tracking claims",
+      "url": "/citizen-portal",
+      "icons": [{ "src": "/icons/citizen-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Officer Dashboard",
+      "short_name": "Officer",
+      "description": "Access officer verification and processing tools",
+      "url": "/officer-dashboard",
+      "icons": [{ "src": "/icons/officer-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Forest Atlas",
+      "short_name": "Atlas",
+      "description": "View interactive forest and village maps",
+      "url": "/atlas",
+      "icons": [{ "src": "/icons/map-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "protocol_handlers": [
+    {
+      "protocol": "web+fra",
+      "url": "/claim/%s"
+    }
+  ],
+  "share_target": {
+    "action": "/share-target/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "documents",
+          "accept": ["image/*", ".pdf", ".doc", ".docx"]
+        }
+      ]
+    }
+  }
+}
