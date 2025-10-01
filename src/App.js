@@ -5,7 +5,7 @@ import { authenticate, logout as authLogout, getCurrentUser } from './auth/authe
 import LanguageProvider from './contexts/LanguageContext';
 
 // Components
-import { Toaster } from 'sonner';
+import { Toaster } from './components/ui/sonner';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Login from './components/Login';
