@@ -22,6 +22,7 @@ import PublicTransparencyPortal from './components/PublicTransparencyPortal';
 import CitizenPortal from './components/CitizenPortal';
 import SimpleMapTest from './components/SimpleMapTest';
 import ForestAtlasFixed from './components/ForestAtlasFixed';
+import ForestAtlasGoogleMaps from './components/ForestAtlasGoogleMaps';
 
 // Auth Context
 const AuthContext = React.createContext();
@@ -143,6 +144,11 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="/atlas" element={
+                <ProtectedRoute>
+                  <ForestAtlasGoogleMaps />
+                </ProtectedRoute>
+              } />
+              <Route path="/atlas-old" element={
                 <ProtectedRoute>
                   <MainLayout>
                     <ForestAtlasFixed />

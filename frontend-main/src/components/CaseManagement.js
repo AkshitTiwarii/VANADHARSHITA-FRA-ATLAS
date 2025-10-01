@@ -224,8 +224,9 @@ const CaseManagement = () => {
       formData.append('file', ocrFile);
       formData.append('language', ocrLanguage);
       formData.append('target_language', currentLanguage);
+      formData.append('use_ml_ner', 'true'); // Enable ML-based NER (v2.0)
 
-      // Call AI service
+      // Call AI service v2.0 with ML-based extraction
       const response = await axios.post(`${AI_SERVICE_URL}/api/process-document`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -326,18 +327,27 @@ const CaseManagement = () => {
         
         setNewClaimData(updatedData);
 
-        const confidence = response.data.validation?.confidence || 0;
+        // Get confidence scores from v2.0 ML response
+        const overallConfidence = response.data.overall_confidence || response.data.validation?.confidence || 0;
+        const confidenceScores = response.data.confidence_scores || {};
         const formType = response.data.form_type || 'Unknown';
-        const formConfidence = response.data.form_detection_confidence || 0;
+        const formConfidence = response.data.form_type_confidence || response.data.form_detection_confidence || 0;
+        const processingMode = response.data.processing_mode || 'regex';
         
         // Show form detection results
         if (formType !== 'Unknown' && formConfidence > 0.3) {
           toast.info(`📋 Detected: ${formType} (${(formConfidence * 100).toFixed(1)}% confidence)`);
         }
         
+        // Show ML mode indicator
+        if (processingMode === 'ml_ner') {
+          toast.success(`🤖 AI-Powered Extraction Active (ML v2.0)`);
+        }
+        
         const message = fieldsUpdated.length > 0 
           ? `✅ Document processed successfully! 
-             🎯 Confidence: ${confidence.toFixed(1)}%
+             🎯 Overall Confidence: ${(overallConfidence * 100).toFixed(1)}%
+             🤖 Mode: ${processingMode === 'ml_ner' ? 'AI (ML)' : 'Basic'}
              📝 Updated: ${fieldsUpdated.join(', ')}`
           : `⚠️ Document processed but no fields could be extracted. Please fill manually.`;
         
@@ -745,9 +755,22 @@ const CaseManagement = () => {
                     <div className="mt-6 space-y-4">
                       <div className="flex items-center mb-3">
                         <Bot className="w-5 h-5 mr-2 text-green-600" />
-                        <h4 className="font-semibold text-green-800">AI Processing Complete ✨</h4>
-                        <span className="ml-auto bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                          {Math.round(ocrResult.confidence_score * 100)}% confidence
+                        <h4 className="font-semibold text-green-800">
+                          AI Processing Complete ✨
+                          {ocrResult.processing_mode === 'ml_ner' && (
+                            <span className="ml-2 bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-normal">
+                              🤖 ML v2.0
+                            </span>
+                          )}
+                        </h4>
+                        <span className={`ml-auto ${
+                          (ocrResult.overall_confidence || ocrResult.confidence_score || 0) > 0.7 
+                            ? 'bg-green-100 text-green-800' 
+                            : (ocrResult.overall_confidence || ocrResult.confidence_score || 0) > 0.5 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : 'bg-orange-100 text-orange-800'
+                        } text-xs px-2 py-1 rounded-full`}>
+                          {Math.round((ocrResult.overall_confidence || ocrResult.confidence_score || 0) * 100)}% confidence
                         </span>
                       </div>
                       
@@ -811,13 +834,29 @@ const CaseManagement = () => {
                             Key Information
                           </h5>
                           <div className="space-y-1 text-sm">
-                            {ocrResult.entities && ocrResult.entities.length > 0 ? (
-                              ocrResult.entities.map((entity, idx) => (
-                                <div key={idx} className="flex justify-between bg-white p-2 rounded border">
-                                  <span className="font-medium text-blue-700">{entity.label}:</span>
-                                  <span className="text-blue-600">{entity.text}</span>
-                                </div>
-                              ))
+                            {ocrResult.entities && Object.keys(ocrResult.entities).length > 0 ? (
+                              Object.entries(ocrResult.entities).map(([key, value], idx) => {
+                                const confidence = ocrResult.confidence_scores?.[key];
+                                return value ? (
+                                  <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border">
+                                    <span className="font-medium text-blue-700 capitalize">
+                                      {key.replace(/_/g, ' ')}:
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-blue-600">{value}</span>
+                                      {confidence !== undefined && (
+                                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                          confidence > 0.7 ? 'bg-green-100 text-green-700' :
+                                          confidence > 0.5 ? 'bg-yellow-100 text-yellow-700' :
+                                          'bg-orange-100 text-orange-700'
+                                        }`}>
+                                          {Math.round(confidence * 100)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : null;
+                              })
                             ) : (
                               <p className="text-blue-600 italic bg-white p-2 rounded border">
                                 🔍 Processing entities...
