@@ -30,7 +30,7 @@ const API = `${BACKEND_URL}/api`;
 const Dashboard = () => {
   const { translate: t, currentLanguage } = useTranslation();
   const [stats, setStats] = useState(null);
-  const [recentClaims, setRecentClaims] = useState([]);
+  const [recentClaims, setRecentClaims] = useState([]); // Always initialize as empty array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useAuth();
@@ -48,7 +48,11 @@ const Dashboard = () => {
       ]);
       
       setStats(statsResponse.data);
-      setRecentClaims(claimsResponse.data.slice(0, 5));
+      // Ensure claimsResponse.data is always an array
+      const claimsData = Array.isArray(claimsResponse.data) 
+        ? claimsResponse.data 
+        : (claimsResponse.data?.claims || []);
+      setRecentClaims(claimsData.slice(0, 5));
       
       // Success toast only if data was actually fetched
       if (statsResponse.data && statsResponse.data.total_claims !== undefined) {
@@ -348,7 +352,7 @@ const Dashboard = () => {
           <CardDescription>{t('latestApplications')}</CardDescription>
         </CardHeader>
         <CardContent>
-          {recentClaims.length > 0 ? (
+          {Array.isArray(recentClaims) && recentClaims.length > 0 ? (
             <div className="space-y-4">
               {recentClaims.map((claim) => (
                 <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">

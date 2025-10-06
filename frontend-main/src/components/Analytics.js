@@ -30,8 +30,8 @@ const API = `${BACKEND_URL}/api`;
 const Analytics = () => {
   const { translate: t } = useTranslation();
   const [stats, setStats] = useState(null);
-  const [claims, setClaims] = useState([]);
-  const [villages, setVillages] = useState([]);
+  const [claims, setClaims] = useState([]); // Always initialize as empty array
+  const [villages, setVillages] = useState([]); // Always initialize as empty array
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('all');
   const [stateFilter, setStateFilter] = useState('');
@@ -49,17 +49,23 @@ const Analytics = () => {
       ]);
       
       setStats(statsResponse.data);
-      setClaims(claimsResponse.data);
-      setVillages(villagesResponse.data);
+      // Ensure data is always an array
+      setClaims(Array.isArray(claimsResponse.data) ? claimsResponse.data : []);
+      setVillages(Array.isArray(villagesResponse.data) ? villagesResponse.data : []);
     } catch (error) {
       console.error('Failed to fetch analytics data:', error);
       toast.error('Failed to load analytics data');
+      // Set empty arrays on error
+      setClaims([]);
+      setVillages([]);
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusDistribution = () => {
+    if (!Array.isArray(claims) || claims.length === 0) return [];
+    
     const statusCounts = claims.reduce((acc, claim) => {
       acc[claim.status] = (acc[claim.status] || 0) + 1;
       return acc;
@@ -73,6 +79,8 @@ const Analytics = () => {
   };
 
   const getStateWiseStats = () => {
+    if (!Array.isArray(villages) || villages.length === 0) return [];
+    
     const stateStats = villages.reduce((acc, village) => {
       if (!acc[village.state]) {
         acc[village.state] = {
@@ -95,12 +103,14 @@ const Analytics = () => {
     }, {});
 
     // Add claims count
-    claims.forEach(claim => {
-      const village = villages.find(v => v.id === claim.village_id);
-      if (village && stateStats[village.state]) {
-        stateStats[village.state].claims += 1;
-      }
-    });
+    if (Array.isArray(claims)) {
+      claims.forEach(claim => {
+        const village = villages.find(v => v.id === claim.village_id);
+        if (village && stateStats[village.state]) {
+          stateStats[village.state].claims += 1;
+        }
+      });
+    }
 
     return Object.entries(stateStats).map(([state, data]) => ({
       state,
@@ -109,6 +119,8 @@ const Analytics = () => {
   };
 
   const getMonthlyTrends = () => {
+    if (!Array.isArray(claims) || claims.length === 0) return [];
+    
     const monthlyData = claims.reduce((acc, claim) => {
       const month = new Date(claim.submitted_date).toLocaleString('default', { month: 'short', year: 'numeric' });
       acc[month] = (acc[month] || 0) + 1;
