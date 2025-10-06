@@ -229,16 +229,17 @@ const Home = () => {
                 onClick={() => navigate('/login')}
                 className="group px-10 py-5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-2xl hover:shadow-orange-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-orange-400/50"
               >
-                <span>🚀</span>
-                {t('getStarted')}
+                <span>�</span>
+                Admin Login
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                onClick={() => navigate('/citizen-portal')}
-                className="group px-10 py-5 bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-teal-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-teal-400/50 backdrop-blur-sm"
+                onClick={() => navigate('/login')}
+                className="group px-10 py-5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-purple-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-purple-400/50 backdrop-blur-sm flex items-center justify-center gap-3"
               >
-                <span>🗺️</span>
-                {t('exploreAtlas')}
+                <span>�</span>
+                User Login
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </div>

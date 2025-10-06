@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
+import { useTranslation } from '../contexts/LanguageContext';
 import { 
   BarChart3, 
   PieChart, 
@@ -27,6 +28,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const Analytics = () => {
+  const { translate: t } = useTranslation();
   const [stats, setStats] = useState(null);
   const [claims, setClaims] = useState([]);
   const [villages, setVillages] = useState([]);
@@ -143,7 +145,7 @@ const Analytics = () => {
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-2 text-slate-600">Loading analytics...</p>
+          <p className="mt-2 text-slate-600">{t('loadingAnalytics')}</p>
         </div>
       </div>
     );
@@ -158,25 +160,25 @@ const Analytics = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-blue-900">Analytics Dashboard</h1>
-          <p className="text-slate-600">Comprehensive insights into forest rights data</p>
+          <h1 className="text-2xl font-bold text-blue-900">{t('analyticsDashboard')}</h1>
+          <p className="text-slate-600">{t('comprehensiveInsights')}</p>
         </div>
         <div className="flex space-x-2">
           <Select value={timeFilter} onValueChange={setTimeFilter}>
             <SelectTrigger className="w-40">
-              <SelectValue placeholder="Time Period" />
+              <SelectValue placeholder={t('timePeriod')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="30d">Last 30 Days</SelectItem>
-              <SelectItem value="90d">Last 3 Months</SelectItem>
-              <SelectItem value="1y">Last Year</SelectItem>
+              <SelectItem value="all">{t('allTime')}</SelectItem>
+              <SelectItem value="30d">{t('last30Days')}</SelectItem>
+              <SelectItem value="90d">{t('last3Months')}</SelectItem>
+              <SelectItem value="1y">{t('lastYear')}</SelectItem>
             </SelectContent>
           </Select>
           
           <Button variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            {t('exportReport')}
           </Button>
         </div>
       </div>
@@ -187,13 +189,13 @@ const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Processing Rate</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('processingRate')}</p>
                 <p className="text-3xl font-bold text-blue-900">
                   {stats?.total_claims ? Math.round(((stats.approved_claims + stats.rejected_claims) / stats.total_claims) * 100) : 0}%
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-xs text-green-600">+12% from last month</span>
+                  <span className="text-xs text-green-600">+12% {t('fromLastMonth')}</span>
                 </div>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -207,13 +209,13 @@ const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Approval Rate</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('approvalRate')}</p>
                 <p className="text-3xl font-bold text-green-700">
                   {stats?.total_claims ? Math.round((stats.approved_claims / stats.total_claims) * 100) : 0}%
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-xs text-green-600">+8% from last month</span>
+                  <span className="text-xs text-green-600">+8% {t('fromLastMonth')}</span>
                 </div>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -227,12 +229,12 @@ const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Avg. Processing Time</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('averageProcessingTime')}</p>
                 <p className="text-3xl font-bold text-orange-600">28</p>
-                <p className="text-sm text-slate-500">days</p>
+                <p className="text-sm text-slate-500">{t('days')}</p>
                 <div className="flex items-center mt-2">
                   <TrendingDown className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-xs text-green-600">-5 days improved</span>
+                  <span className="text-xs text-green-600">-5 {t('days')} improved</span>
                 </div>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">

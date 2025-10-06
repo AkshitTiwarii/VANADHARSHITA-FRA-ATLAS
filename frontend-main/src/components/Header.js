@@ -49,7 +49,7 @@ const Header = ({ user, sidebarOpen, setSidebarOpen }) => {
         {/* Center Section - Breadcrumb/Title */}
         <div className="hidden md:flex items-center space-x-2 text-sm text-slate-600">
           <Globe className="w-4 h-4" />
-          <span>Ministry of Tribal Affairs | Government of India</span>
+          <span>{t('ministryOfTribalAffairs')}</span>
         </div>
 
         {/* Right Section */}
@@ -121,12 +121,12 @@ const Header = ({ user, sidebarOpen, setSidebarOpen }) => {
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center space-x-4">
             <span className="text-orange-300">●</span>
-            <span>Secure Government Portal</span>
+            <span>{t('secureGovernmentPortal')}</span>
           </div>
           <div className="hidden md:flex items-center space-x-4 text-xs">
-            <span>Last Login: {new Date().toLocaleDateString()}</span>
+            <span>{t('lastLogin')}: {new Date().toLocaleDateString()}</span>
             <span>|</span>
-            <span>NIC Certified</span>
+            <span>{t('nicCertified')}</span>
           </div>
         </div>
       </div>

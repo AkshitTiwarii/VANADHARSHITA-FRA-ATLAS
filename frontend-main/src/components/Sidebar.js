@@ -15,7 +15,8 @@ import {
   Eye,
   Briefcase,
   Globe,
-  ChevronRight
+  ChevronRight,
+  Satellite
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, userRole }) => {
@@ -24,80 +25,96 @@ const Sidebar = ({ isOpen, userRole }) => {
   // Organized navigation with sections
   const navigationSections = [
     {
-      title: 'Main',
+      title: t('sidebarMain'),
       items: [
         {
-          name: 'Home',
+          name: t('sidebarHome'),
           href: '/',
           icon: Home,
           roles: ['admin', 'officer', 'verifier', 'viewer'],
-          description: 'Landing page'
+          description: t('sidebarHomeLandingPage')
         },
         {
-          name: 'Overview Dashboard',
+          name: t('sidebarOverviewDashboard'),
           href: '/dashboard',
           icon: LayoutDashboard,
           roles: ['admin', 'officer', 'verifier', 'viewer'],
-          description: 'System overview & statistics'
+          description: t('sidebarOverviewDashboardDesc')
         }
       ]
     },
     {
-      title: 'Work Management',
+      title: t('sidebarWorkManagement'),
       items: [
         {
-          name: 'My Work',
+          name: t('sidebarMyWork'),
           href: '/officer-dashboard',
           icon: Briefcase,
           roles: ['admin', 'officer'],
-          description: 'Your assigned tasks & cases',
-          badge: 'Officer'
+          description: t('sidebarMyWorkDesc'),
+          badge: t('badgeOfficer')
         },
         {
-          name: 'Case Processing',
+          name: t('sidebarFileClaim'),
+          href: '/citizen-portal',
+          icon: FileText,
+          roles: ['viewer'],
+          description: t('sidebarFileClaimDesc'),
+          badge: t('badgeNew')
+        },
+        {
+          name: t('sidebarCaseProcessing'),
           href: '/cases',
           icon: FileText,
           roles: ['admin', 'officer', 'verifier'],
-          description: 'Manage forest rights claims'
+          description: t('sidebarCaseProcessingDesc')
         },
         {
-          name: 'Interactive Map',
+          name: t('sidebarInteractiveMap'),
           href: '/atlas',
           icon: Map,
           roles: ['admin', 'officer', 'verifier', 'viewer'],
-          description: 'Forest boundaries & claims'
+          description: t('sidebarInteractiveMapDesc')
+        },
+        {
+          name: t('sidebarForestMonitoring'),
+          href: '/monitoring',
+          icon: Satellite,
+          roles: ['admin', 'officer'],
+          badge: t('badgeRealtime'),
+          description: t('sidebarForestMonitoringDesc')
         }
       ]
     },
     {
-      title: 'Analysis & Reports',
+      title: t('sidebarAnalysisReports'),
       items: [
         {
-          name: 'Analytics',
+          name: t('sidebarAnalytics'),
           href: '/analytics',
           icon: BarChart3,
           roles: ['admin', 'officer'],
-          description: 'Detailed insights & trends'
+          description: t('sidebarAnalyticsDesc')
         },
         {
-          name: 'Public Portal',
+          name: t('sidebarPublicPortal'),
           href: '/transparency',
           icon: Globe,
           roles: ['admin', 'officer', 'verifier', 'viewer'],
-          description: 'Transparency & public data'
+          description: t('sidebarPublicPortalDesc')
         }
       ]
     },
     {
-      title: 'Administration',
+      title: t('sidebarAdministration'),
       items: [
         {
-          name: 'System Admin',
+          name: t('sidebarSystemAdmin'),
           href: '/admin',
           icon: Settings,
           roles: ['admin'],
-          description: 'Users, settings & logs',
-          badge: 'Admin Only'
+          description: t('sidebarSystemAdminDesc'),
+          badge: t('badgeAdminOnly')
         }
       ]
     }
@@ -123,9 +140,9 @@ const Sidebar = ({ isOpen, userRole }) => {
           <div className="mb-6 pb-4 border-b border-blue-800">
             <div className="flex items-center space-x-2 mb-2">
               <Trees className="w-5 h-5 text-green-400" />
-              <span className="font-medium text-sm">Forest Department</span>
+              <span className="font-medium text-sm">{t('forestDepartment')}</span>
             </div>
-            <p className="text-xs text-blue-200">Digital India Initiative</p>
+            <p className="text-xs text-blue-200">{t('digitalIndiaInitiative')}</p>
           </div>
         )}
 
@@ -193,32 +210,32 @@ const Sidebar = ({ isOpen, userRole }) => {
             <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg">
               <div className="flex items-center space-x-2 mb-1">
                 <Eye className="h-4 w-4 text-white" />
-                <span className="text-xs font-medium text-white/90">Current Role</span>
+                <span className="text-xs font-medium text-white/90">{t('currentRole')}</span>
               </div>
               <p className="text-sm font-bold text-white capitalize">{userRole}</p>
             </div>
             
             {/* System Status */}
             <div className="p-3 bg-blue-800 rounded-lg">
-              <h4 className="text-sm font-medium text-blue-100 mb-3">System Status</h4>
+              <h4 className="text-sm font-medium text-blue-100 mb-3">{t('systemStatus')}</h4>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-blue-200">Server Status</span>
+                  <span className="text-blue-200">{t('serverStatus')}</span>
                   <div className="flex items-center space-x-1">
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-green-400">Online</span>
+                    <span className="text-green-400">{t('online')}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-blue-200">Database</span>
+                  <span className="text-blue-200">{t('database')}</span>
                   <div className="flex items-center space-x-1">
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-green-400">Connected</span>
+                    <span className="text-green-400">{t('connected')}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-blue-200">Last Sync</span>
-                  <span className="text-blue-200">2 min ago</span>
+                  <span className="text-blue-200">{t('lastSync')}</span>
+                  <span className="text-blue-200">2 {t('minAgo')}</span>
                 </div>
               </div>
             </div>

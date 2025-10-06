@@ -23,6 +23,7 @@ import CitizenPortal from './components/CitizenPortal';
 import SimpleMapTest from './components/SimpleMapTest';
 import ForestAtlasFixed from './components/ForestAtlasFixed';
 import ForestAtlasGoogleMaps from './components/ForestAtlasGoogleMaps';
+import ForestMonitoringDashboard from './components/ForestMonitoringDashboard';
 
 // Auth Context
 const AuthContext = React.createContext();
@@ -134,6 +135,8 @@ function App() {
               {/* Public Routes - No login required */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/atlas" element={<ForestAtlasGoogleMaps />} />
+              <Route path="/citizen-portal" element={<CitizenPortal />} />
               
               {/* Protected Routes - Login required */}
               <Route path="/dashboard" element={
@@ -143,9 +146,9 @@ function App() {
                   </MainLayout>
                 </ProtectedRoute>
               } />
-              <Route path="/atlas" element={
+              <Route path="/monitoring" element={
                 <ProtectedRoute>
-                  <ForestAtlasGoogleMaps />
+                  <ForestMonitoringDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/atlas-old" element={
@@ -205,11 +208,9 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="/transparency" element={
-                <MainLayout>
-                  <PublicTransparencyPortal />
-                </MainLayout>
+                <PublicTransparencyPortal />
               } />
-              <Route path="/citizen-portal" element={
+              <Route path="/citizen-portal-old" element={
                 <MainLayout>
                   <CitizenPortal />
                 </MainLayout>

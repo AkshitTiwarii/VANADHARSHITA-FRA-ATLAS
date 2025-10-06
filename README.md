@@ -87,9 +87,14 @@ cd frontend-main && npm start
 
 ## 📝 **Documentation**
 
-- 📊 **[SERVICES_STATUS.md](SERVICES_STATUS.md)** - Detailed service documentation
-- 🌍 **[MULTILINGUAL_FEATURES.md](MULTILINGUAL_FEATURES.md)** - Translation system docs
-- 🔨 **[FRA_REAL_WORLD_IMPLEMENTATION.md](FRA_REAL_WORLD_IMPLEMENTATION.md)** - Implementation guide
+For complete documentation including:
+- API references
+- Feature details
+- Testing guides
+- Troubleshooting
+- Development guidelines
+
+**👉 See [DOCUMENTATION.md](DOCUMENTATION.md)** - Complete comprehensive documentation
 
 ## 🎯 **Tested & Verified**
 
