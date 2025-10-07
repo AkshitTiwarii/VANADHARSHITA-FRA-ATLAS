@@ -14,32 +14,57 @@ class TranslationService {
     };
     
     // All supported languages (Google Translate supports 100+)
-    // Indian languages prioritized at the top
+    // ALL 22 Official Indian languages + Major Tribal languages first
+    // International languages at the bottom
     this.supportedLanguages = {
-      // National Languages (India)
+      // === INDIAN LANGUAGES (22 Official + Tribal) ===
+      
+      // National Languages
       'en': { name: 'English', nativeName: 'English', region: 'National', googleCode: 'en' },
       'hi': { name: 'Hindi', nativeName: 'हिन्दी', region: 'National', googleCode: 'hi' },
       
-      // Regional Indian Languages
-      'or': { name: 'Odia', nativeName: 'ଓଡ଼ିଆ', region: 'Odisha', googleCode: 'or' },
-      'te': { name: 'Telugu', nativeName: 'తెలుగు', region: 'Telangana', googleCode: 'te' },
-      'bn': { name: 'Bengali', nativeName: 'বাংলা', region: 'Tripura', googleCode: 'bn' },
-      'ta': { name: 'Tamil', nativeName: 'தமிழ்', region: 'Tamil Nadu', googleCode: 'ta' },
-      'ml': { name: 'Malayalam', nativeName: 'മലയാളം', region: 'Kerala', googleCode: 'ml' },
-      'kn': { name: 'Kannada', nativeName: 'ಕನ್ನಡ', region: 'Karnataka', googleCode: 'kn' },
+      // 22 Official Indian Languages (in Devanagari alphabetical order)
+      'as': { name: 'Assamese', nativeName: 'অসমীয়া', region: 'Assam', googleCode: 'as' },
+      'bn': { name: 'Bengali', nativeName: 'বাংলা', region: 'West Bengal/Tripura', googleCode: 'bn' },
+      'brx': { name: 'Bodo', nativeName: 'बड़ो', region: 'Assam', googleCode: 'hi', fallback: true },
+      'doi': { name: 'Dogri', nativeName: 'डोगरी', region: 'Jammu & Kashmir', googleCode: 'hi', fallback: true },
       'gu': { name: 'Gujarati', nativeName: 'ગુજરાતી', region: 'Gujarat', googleCode: 'gu' },
+      'kn': { name: 'Kannada', nativeName: 'ಕನ್ನಡ', region: 'Karnataka', googleCode: 'kn' },
+      'ks': { name: 'Kashmiri', nativeName: 'कॉशुर / كٲشُر', region: 'Jammu & Kashmir', googleCode: 'ur', fallback: true },
+      'kok': { name: 'Konkani', nativeName: 'कोंकणी', region: 'Goa/Maharashtra', googleCode: 'hi', fallback: true },
+      'mai': { name: 'Maithili', nativeName: 'मैथिली', region: 'Bihar', googleCode: 'hi', fallback: true },
+      'ml': { name: 'Malayalam', nativeName: 'മലയാളം', region: 'Kerala', googleCode: 'ml' },
+      'mni': { name: 'Manipuri (Meitei)', nativeName: 'মৈতৈলোন্', region: 'Manipur', googleCode: 'bn', fallback: true },
       'mr': { name: 'Marathi', nativeName: 'मराठी', region: 'Maharashtra', googleCode: 'mr' },
+      'ne': { name: 'Nepali', nativeName: 'नेपाली', region: 'Sikkim/West Bengal', googleCode: 'ne' },
+      'or': { name: 'Odia', nativeName: 'ଓଡ଼ିଆ', region: 'Odisha', googleCode: 'or' },
       'pa': { name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', region: 'Punjab', googleCode: 'pa' },
+      'sa': { name: 'Sanskrit', nativeName: 'संस्कृतम्', region: 'National', googleCode: 'sa' },
+      'sat': { name: 'Santali', nativeName: 'ᱥᱟᱱᱛᱟᱲᱤ', region: 'Jharkhand/Odisha', googleCode: 'hi', fallback: true },
+      'sd': { name: 'Sindhi', nativeName: 'سنڌي / सिन्धी', region: 'Gujarat', googleCode: 'sd' },
+      'ta': { name: 'Tamil', nativeName: 'தமிழ்', region: 'Tamil Nadu', googleCode: 'ta' },
+      'te': { name: 'Telugu', nativeName: 'తెలుగు', region: 'Telangana/Andhra Pradesh', googleCode: 'te' },
+      'ur': { name: 'Urdu', nativeName: 'اُردُو', region: 'Jammu & Kashmir', googleCode: 'ur' },
       
-      // Tribal Languages (using closest available on Google Translate)
-      'sat': { name: 'Santali', nativeName: 'ᱥᱟᱱᱛᱟᱲᱤ', region: 'Odisha/MP', googleCode: 'hi', fallback: true },
-      'gon': { name: 'Gondi', nativeName: 'गोंडी', region: 'MP/Telangana', googleCode: 'hi', fallback: true },
-      'kok': { name: 'Kokborok', nativeName: 'কোকবরোক', region: 'Tripura', googleCode: 'bn', fallback: true },
-      'ho': { name: 'Ho', nativeName: 'होो', region: 'Odisha', googleCode: 'hi', fallback: true },
-      'mun': { name: 'Mundari', nativeName: 'मुण्डारी', region: 'Odisha', googleCode: 'hi', fallback: true },
+      // Major Tribal Languages (Important for FRA)
+      'gon': { name: 'Gondi', nativeName: 'गोंडी', region: 'MP/Chhattisgarh/Telangana', googleCode: 'hi', fallback: true },
       'kha': { name: 'Khasi', nativeName: 'খাসি', region: 'Meghalaya', googleCode: 'bn', fallback: true },
+      'ho': { name: 'Ho', nativeName: 'होो', region: 'Jharkhand/Odisha', googleCode: 'hi', fallback: true },
+      'mun': { name: 'Mundari', nativeName: 'मुण्डारी', region: 'Jharkhand/Odisha', googleCode: 'hi', fallback: true },
+      'kur': { name: 'Kurukh (Oraon)', nativeName: 'कुड़ुख़', region: 'Jharkhand/Chhattisgarh', googleCode: 'hi', fallback: true },
+      'bh': { name: 'Bhili', nativeName: 'भीली', region: 'MP/Rajasthan/Gujarat', googleCode: 'hi', fallback: true },
+      'krx': { name: 'Kokborok', nativeName: 'কোকবরোক', region: 'Tripura', googleCode: 'bn', fallback: true },
+      'grt': { name: 'Garo', nativeName: 'মান্দি', region: 'Meghalaya', googleCode: 'bn', fallback: true },
       
-      // International Languages (below Indian languages)
+      // Other Indian Regional Languages
+      'raj': { name: 'Rajasthani', nativeName: 'राजस्थानी', region: 'Rajasthan', googleCode: 'hi', fallback: true },
+      'bho': { name: 'Bhojpuri', nativeName: 'भोजपुरी', region: 'Bihar/UP', googleCode: 'hi', fallback: true },
+      'mag': { name: 'Magahi', nativeName: 'मगही', region: 'Bihar', googleCode: 'hi', fallback: true },
+      'awa': { name: 'Awadhi', nativeName: 'अवधी', region: 'Uttar Pradesh', googleCode: 'hi', fallback: true },
+      'bgc': { name: 'Haryanvi', nativeName: 'हरियाणवी', region: 'Haryana', googleCode: 'hi', fallback: true },
+      'hne': { name: 'Chhattisgarhi', nativeName: 'छत्तीसगढ़ी', region: 'Chhattisgarh', googleCode: 'hi', fallback: true },
+      
+      // === INTERNATIONAL LANGUAGES (Bottom of Menu) ===
       'es': { name: 'Spanish', nativeName: 'Español', region: 'International', googleCode: 'es' },
       'fr': { name: 'French', nativeName: 'Français', region: 'International', googleCode: 'fr' },
       'de': { name: 'German', nativeName: 'Deutsch', region: 'International', googleCode: 'de' },
