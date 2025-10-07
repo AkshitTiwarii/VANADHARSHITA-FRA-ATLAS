@@ -227,17 +227,17 @@ const Home = () => {
             <div className="flex flex-col sm:flex-row gap-6 justify-center">
               <button
                 onClick={() => navigate('/login')}
-                className="group px-10 py-5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-2xl hover:shadow-orange-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-orange-400/50"
+                className="group px-10 py-5 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-2xl hover:shadow-green-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-green-400/50"
               >
-                <span>�</span>
+                <span>🔐</span>
                 Admin Login
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
                 onClick={() => navigate('/login')}
-                className="group px-10 py-5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-purple-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-purple-400/50 backdrop-blur-sm flex items-center justify-center gap-3"
+                className="group px-10 py-5 bg-gradient-to-r from-teal-600 to-cyan-700 hover:from-teal-700 hover:to-cyan-800 text-white rounded-2xl font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-teal-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-teal-400/50 backdrop-blur-sm flex items-center justify-center gap-3"
               >
-                <span>�</span>
+                <span>👤</span>
                 User Login
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
@@ -526,14 +526,14 @@ const Home = () => {
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <button
               onClick={() => navigate('/login')}
-              className="group px-12 py-5 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black rounded-2xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-yellow-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-yellow-300/50"
+              className="group px-12 py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-green-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-green-300/50"
             >
               <span>⚡</span>
               {t('startManagingCases')}
             </button>
             <button
               onClick={() => navigate('/login')}
-              className="group px-12 py-5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-purple-400/50 backdrop-blur-sm"
+              className="group px-12 py-5 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-2xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-teal-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-teal-400/50 backdrop-blur-sm"
             >
               <span>📊</span>
               {t('viewDashboard')}

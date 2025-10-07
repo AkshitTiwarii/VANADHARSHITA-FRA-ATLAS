@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../contexts/LanguageContext';
 import { 
   BarChart3,
@@ -12,7 +13,8 @@ import {
   Calendar,
   Filter,
   Info,
-  ExternalLink
+  ExternalLink,
+  ArrowLeft
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -20,6 +22,7 @@ import { Badge } from './ui/badge';
 
 const PublicTransparencyPortal = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [selectedState, setSelectedState] = useState('all');
   const [selectedYear, setSelectedYear] = useState('2024');
   const [viewType, setViewType] = useState('overview');
@@ -135,10 +138,19 @@ const PublicTransparencyPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white">
+      <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Back Button */}
+          <button
+            onClick={() => navigate(-1)}
+            className="mb-4 flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/30"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">{t('back') || 'Back'}</span>
+          </button>
+          
           <div className="text-center">
             <h1 className="text-3xl font-bold mb-2">{t('publicTransparencyPortal')}</h1>
             <p className="text-lg opacity-90">{t('transparentAccessToFRAData')}</p>
