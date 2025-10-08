@@ -168,16 +168,16 @@ const Analytics = () => {
   const monthlyTrends = getMonthlyTrends();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-blue-900">{t('analyticsDashboard')}</h1>
-          <p className="text-slate-600">{t('comprehensiveInsights')}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-blue-900">{t('analyticsDashboard')}</h1>
+          <p className="text-sm sm:text-base text-slate-600">{t('comprehensiveInsights')}</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
           <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder={t('timePeriod')} />
             </SelectTrigger>
             <SelectContent>
@@ -188,7 +188,7 @@ const Analytics = () => {
             </SelectContent>
           </Select>
           
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <Download className="w-4 h-4 mr-2" />
             {t('exportReport')}
           </Button>
@@ -196,7 +196,7 @@ const Analytics = () => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

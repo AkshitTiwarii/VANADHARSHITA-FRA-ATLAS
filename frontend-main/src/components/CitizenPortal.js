@@ -45,8 +45,14 @@ const CitizenPortal = () => {
     locationDescription: '',
     beneficiaryName: '',
     fatherName: '',
-    documents: []
+    documents: [],
+    latitude: '',
+    longitude: ''
   });
+  
+  const [submittingClaim, setSubmittingClaim] = useState(false);
+  const [workflowResult, setWorkflowResult] = useState(null);
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
 
   // Mock user claims data with realistic FRA scenarios
   const mockClaims = [
@@ -272,7 +278,8 @@ const CitizenPortal = () => {
           beneficiaryName: data.name || prev.beneficiaryName,
           fatherName: data.father_name || prev.fatherName,
           landArea: data.land_area || prev.landArea,
-          locationDescription: data.location || prev.locationDescription
+          locationDescription: data.location || prev.locationDescription,
+          documents: [...prev.documents, imageBlob] // Store the document for later submission
         }));
 
         toast.success('Document scanned successfully! Form fields auto-filled.', {
@@ -293,6 +300,151 @@ const CitizenPortal = () => {
     const file = event.target.files?.[0];
     if (file) {
       await processOCR(file);
+    }
+  };
+  
+  // NEW: Handle comprehensive document verification workflow
+  const handleSubmitClaim = async () => {
+    // Validation
+    if (!newClaim.beneficiaryName || !newClaim.locationDescription) {
+      toast.error('Please fill in required fields', {
+        description: 'Name and location are required'
+      });
+      return;
+    }
+    
+    if (newClaim.documents.length === 0) {
+      toast.error('Please upload a document', {
+        description: 'Upload a patta or forest rights document to proceed'
+      });
+      return;
+    }
+    
+    // Get geolocation or use manual coordinates
+    let latitude = newClaim.latitude;
+    let longitude = newClaim.longitude;
+    
+    // Try to get current location if not provided
+    if (!latitude || !longitude) {
+      toast.info('Detecting your location...', {
+        description: 'This helps verify your forest rights claim'
+      });
+      
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000
+          });
+        });
+        
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+        
+        toast.success('Location detected', {
+          description: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`
+        });
+      } catch (geoError) {
+        toast.warning('Could not detect location', {
+          description: 'Using default coordinates. You can update later.'
+        });
+        // Use default coordinates for testing (Gadchiroli, Maharashtra)
+        latitude = 18.9217;
+        longitude = 77.0038;
+      }
+    }
+    
+    setSubmittingClaim(true);
+    
+    try {
+      const formData = new FormData();
+      
+      // Use the first uploaded document
+      const documentFile = newClaim.documents[0];
+      formData.append('file', documentFile, documentFile.name || 'document.jpg');
+      formData.append('applicant_name', newClaim.beneficiaryName);
+      formData.append('applicant_location', newClaim.locationDescription);
+      formData.append('latitude', latitude);
+      formData.append('longitude', longitude);
+      formData.append('language', currentLanguage || 'auto');
+      
+      toast.info('🔄 Starting comprehensive verification...', {
+        description: 'This may take 10-15 seconds'
+      });
+      
+      // Call the comprehensive verification workflow
+      const response = await axios.post(
+        'http://localhost:8000/api/document/comprehensive-verification',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 30000 // 30 second timeout
+        }
+      );
+      
+      console.log('Workflow response:', response.data);
+      
+      if (response.data.success) {
+        setWorkflowResult(response.data);
+        setShowWorkflowModal(true);
+        
+        // Show appropriate toast based on workflow status
+        if (response.data.status === 'approved') {
+          toast.success('🎉 Application Approved!', {
+            description: `DSS Score: ${response.data.dss_recommendation?.score || 'N/A'} - ${response.data.dss_recommendation?.recommendation || ''}`
+          });
+        } else if (response.data.status === 'manual_review_required' || response.data.status === 'manual_review') {
+          toast.warning('⚠️ Manual Review Required', {
+            description: 'Your application has been sent to an officer for review'
+          });
+        } else if (response.data.status === 'blockchain_failed') {
+          toast.error('❌ Verification Failed', {
+            description: 'Document verification failed. Officer has been notified.'
+          });
+        } else {
+          toast.info('📋 Application Submitted', {
+            description: `Status: ${response.data.status}`
+          });
+        }
+        
+        // Reset form
+        setNewClaim({
+          claimType: '',
+          landArea: '',
+          locationDescription: '',
+          beneficiaryName: '',
+          fatherName: '',
+          documents: [],
+          latitude: '',
+          longitude: ''
+        });
+        
+      } else {
+        throw new Error(response.data.message || 'Verification failed');
+      }
+      
+    } catch (error) {
+      console.error('Claim submission error:', error);
+      
+      let errorMessage = 'Failed to submit claim';
+      let errorDescription = 'Please try again or contact support';
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'Request timeout';
+        errorDescription = 'The verification is taking longer than expected. Please check status later.';
+      } else if (error.response) {
+        errorMessage = 'Verification error';
+        errorDescription = error.response.data?.detail || error.response.data?.message || 'Server error occurred';
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = 'Network error';
+        errorDescription = 'Please check if AI service is running on port 8000';
+      }
+      
+      toast.error(errorMessage, { description: errorDescription });
+    } finally {
+      setSubmittingClaim(false);
     }
   };
 
@@ -565,9 +717,37 @@ const CitizenPortal = () => {
                 </div>
 
                 {/* Submit Button */}
-                <div className="flex justify-end">
-                  <Button className="px-8 py-2 bg-green-600 hover:bg-green-700">
-                    {t('submitClaim')}
+                <div className="flex justify-end gap-4">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setNewClaim({
+                        claimType: '',
+                        landArea: '',
+                        locationDescription: '',
+                        beneficiaryName: '',
+                        fatherName: '',
+                        documents: [],
+                        latitude: '',
+                        longitude: ''
+                      });
+                    }}
+                  >
+                    {t('reset') || 'Reset'}
+                  </Button>
+                  <Button 
+                    className="px-8 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleSubmitClaim}
+                    disabled={submittingClaim || !newClaim.beneficiaryName || !newClaim.locationDescription}
+                  >
+                    {submittingClaim ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('processing') || 'Processing...'}
+                      </>
+                    ) : (
+                      t('submitClaim')
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -780,6 +960,192 @@ const CitizenPortal = () => {
 
       {/* Hidden Canvas for Image Processing */}
       <canvas ref={canvasRef} className="hidden" />
+      
+      {/* Workflow Result Modal */}
+      {showWorkflowModal && workflowResult && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  {workflowResult.status === 'approved' && <CheckCircle2 className="w-6 h-6 text-green-600" />}
+                  {(workflowResult.status === 'manual_review_required' || workflowResult.status === 'manual_review') && <Clock className="w-6 h-6 text-yellow-600" />}
+                  {workflowResult.status === 'blockchain_failed' && <AlertTriangle className="w-6 h-6 text-red-600" />}
+                  Application Verification Result
+                </CardTitle>
+                <button
+                  onClick={() => setShowWorkflowModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {/* Workflow ID and Status */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Workflow ID</p>
+                    <p className="font-mono font-bold text-blue-600">{workflowResult.workflow_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Status</p>
+                    <Badge className={getStatusColor(workflowResult.status)}>
+                      {workflowResult.status.toUpperCase().replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Blockchain & Hyperledger Hashes */}
+              {workflowResult.blockchain_hash && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🔗 Blockchain Verification
+                  </h3>
+                  <div className="bg-green-50 border border-green-200 p-3 rounded">
+                    <p className="text-xs text-gray-600">Transaction Hash</p>
+                    <p className="font-mono text-sm break-all">{workflowResult.blockchain_hash}</p>
+                  </div>
+                </div>
+              )}
+
+              {workflowResult.hyperledger_hash && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🔐 Hyperledger Record
+                  </h3>
+                  <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                    <p className="text-xs text-gray-600">Immutable Hash</p>
+                    <p className="font-mono text-sm break-all">{workflowResult.hyperledger_hash}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Location Verification */}
+              {workflowResult.location_match_score !== null && workflowResult.location_match_score !== undefined && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🛰️ Location Verification
+                  </h3>
+                  <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Match Score</span>
+                      <span className="font-bold text-lg">{workflowResult.location_match_score}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          workflowResult.location_match_score >= 70 ? 'bg-green-500' :
+                          workflowResult.location_match_score >= 40 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{width: `${workflowResult.location_match_score}%`}}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* DSS Recommendation */}
+              {workflowResult.dss_recommendation && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🎯 Eligibility Evaluation (DSS)
+                  </h3>
+                  <div className="bg-purple-50 border border-purple-200 p-4 rounded space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Overall Score</span>
+                      <span className="font-bold text-2xl text-purple-600">
+                        {workflowResult.dss_recommendation.score}/100
+                      </span>
+                    </div>
+                    <div className="border-t pt-3">
+                      <p className="text-sm font-semibold mb-2">
+                        Recommendation: <span className="text-purple-600">{workflowResult.dss_recommendation.recommendation}</span>
+                      </p>
+                      {workflowResult.dss_recommendation.eligible_schemes && workflowResult.dss_recommendation.eligible_schemes.length > 0 && (
+                        <div>
+                          <p className="text-sm font-semibold mb-2">Eligible Schemes:</p>
+                          <ul className="space-y-1">
+                            {workflowResult.dss_recommendation.eligible_schemes.map((scheme, idx) => (
+                              <li key={idx} className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                {scheme}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {workflowResult.dss_recommendation.factors && workflowResult.dss_recommendation.factors.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-semibold mb-2">Scoring Factors:</p>
+                          <ul className="space-y-1">
+                            {workflowResult.dss_recommendation.factors.map((factor, idx) => (
+                              <li key={idx} className="text-sm text-gray-700">• {factor}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Final Decision */}
+              <div className={`p-4 rounded-lg border-2 ${
+                workflowResult.final_decision === 'approved' ? 'bg-green-50 border-green-300' :
+                'bg-yellow-50 border-yellow-300'
+              }`}>
+                <h3 className="font-bold text-lg mb-2">
+                  {workflowResult.final_decision === 'approved' ? '✅ Application Approved' : '⏳ Under Review'}
+                </h3>
+                <p className="text-sm">
+                  {workflowResult.final_decision === 'approved' 
+                    ? 'Congratulations! Your forest rights application has been automatically approved. You will receive further instructions via SMS/email.'
+                    : 'Your application has been forwarded to an officer for manual review. You will be notified of the outcome within 7-14 working days.'}
+                </p>
+              </div>
+
+              {/* Officer Report Info */}
+              {workflowResult.officer_report_id && (
+                <div className="bg-orange-50 border border-orange-200 p-4 rounded">
+                  <h4 className="font-semibold text-orange-800 mb-2">Officer Review Required</h4>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Report ID: <span className="font-mono font-bold">{workflowResult.officer_report_id}</span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    An officer has been assigned to review your application. Please keep this Report ID for tracking purposes.
+                  </p>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(workflowResult.workflow_id);
+                    toast.success('Workflow ID copied to clipboard');
+                  }}
+                >
+                  Copy Workflow ID
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowWorkflowModal(false);
+                    setActiveTab('track-claims'); // Switch to track claims tab
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Track Application
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

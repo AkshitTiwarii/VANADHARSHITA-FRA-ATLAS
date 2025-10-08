@@ -106,7 +106,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
       {/* Backend Connection Warning */}
       {error && (
         <ErrorMessage 
@@ -117,24 +117,24 @@ const Dashboard = () => {
       )}
 
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white p-6 rounded-lg shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2 text-orange-300">
+      <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white p-4 sm:p-6 rounded-lg shadow-lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold mb-2 text-orange-300">
               {t('welcome')}, {user?.full_name}
             </h1>
-            <p className="text-blue-100">
+            <p className="text-sm sm:text-base text-blue-100">
               {user?.role && user.role.charAt(0).toUpperCase() + user.role.slice(1)} | {user?.department}
             </p>
             {user?.district && (
-              <p className="text-blue-200 text-sm mt-1">
-                <MapPin className="w-4 h-4 inline mr-1" />
+              <p className="text-blue-200 text-xs sm:text-sm mt-1">
+                <MapPin className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1" />
                 {user.district}, {user.state}
               </p>
             )}
           </div>
-          <div className="text-right">
-            <div className="flex items-center space-x-3 mb-2">
+          <div className="text-left sm:text-right w-full sm:w-auto">
+            <div className="flex items-center space-x-2 sm:space-x-3 mb-2">
               <Button 
                 variant="outline" 
                 size="sm"
@@ -142,14 +142,14 @@ const Dashboard = () => {
                   setLoading(true);
                   fetchDashboardData();
                 }}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/30"
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs sm:text-sm"
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
+                <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                 {t('refresh')}
               </Button>
             </div>
-            <p className="text-blue-200 text-sm">{t('todaysDate')}</p>
-            <p className="text-xl font-semibold">
+            <p className="text-blue-200 text-xs sm:text-sm">{t('todaysDate')}</p>
+            <p className="text-lg sm:text-xl font-semibold">
               {new Date().toLocaleDateString(
                 currentLanguage === 'bn' ? 'bn-BD' : 
                 currentLanguage === 'hi' ? 'hi-IN' : 
@@ -162,7 +162,7 @@ const Dashboard = () => {
       </div>
 
       {/* Key Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

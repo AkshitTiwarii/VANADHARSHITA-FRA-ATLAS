@@ -16,10 +16,11 @@ import {
   Briefcase,
   Globe,
   ChevronRight,
-  Satellite
+  Satellite,
+  Leaf
 } from 'lucide-react';
 
-const Sidebar = ({ isOpen, userRole }) => {
+const Sidebar = ({ isOpen, userRole, onNavigate }) => {
   const { translate: t } = useTranslation();
   
   // Organized navigation with sections
@@ -130,11 +131,37 @@ const Sidebar = ({ isOpen, userRole }) => {
   const filteredSections = getFilteredSections();
 
   return (
-    <aside className={`bg-blue-900 text-white fixed left-0 top-0 h-full transition-all duration-300 z-40 ${isOpen ? 'w-64' : 'w-16'} shadow-lg`}>
-      {/* Header spacing */}
-      <div className="h-[120px]"></div>
+    <aside className={`bg-blue-900 text-white fixed left-0 top-0 h-full transition-all duration-300 shadow-lg
+      ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      ${isOpen ? 'w-64' : 'lg:w-16 w-64'}
+      z-50 lg:z-40`}>
+      {/* Sidebar Header with Branding */}
+      <div className="h-[120px] border-b border-blue-800/50">
+        <div className={`${isOpen ? 'p-4' : 'lg:p-2 p-4'} h-full flex flex-col justify-center`}>
+          {isOpen ? (
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                  <Leaf className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">VANADHARSHITA</h2>
+                  <p className="text-xs text-blue-200">FRA-Connect</p>
+                </div>
+              </div>
+              <p className="text-xs text-blue-300 pl-1">AI-Powered Forest Rights Portal</p>
+            </div>
+          ) : (
+            <div className="hidden lg:flex justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                <Leaf className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       
-      <div className={`${isOpen ? 'p-4' : 'p-2'} h-[calc(100%-120px)] overflow-y-auto`}>
+      <div className={`${isOpen ? 'p-4' : 'lg:p-2 p-4'} h-[calc(100%-120px)] overflow-y-auto`}>
         {/* Department Info */}
         {isOpen && (
           <div className="mb-6 pb-4 border-b border-blue-800">
@@ -147,11 +174,11 @@ const Sidebar = ({ isOpen, userRole }) => {
         )}
 
         {/* Navigation Menu - Organized by Sections */}
-        <nav className={`${isOpen ? 'space-y-6' : 'space-y-3'}`}>
+        <nav className={`${isOpen ? 'space-y-6' : 'lg:space-y-3 space-y-6'}`}>
           {filteredSections.map((section, sectionIndex) => (
             <div key={section.title}>
               {/* Section Header */}
-              {isOpen && (
+              {(isOpen || window.innerWidth < 1024) && (
                 <div className="mb-3">
                   <h3 className="text-xs font-semibold text-blue-300 uppercase tracking-wider px-1">
                     {section.title}
@@ -160,22 +187,24 @@ const Sidebar = ({ isOpen, userRole }) => {
               )}
               
               {/* Section Items */}
-              <div className={`${isOpen ? 'space-y-1' : 'space-y-2'}`}>
+              <div className={`${isOpen ? 'space-y-1' : 'lg:space-y-2 space-y-1'}`}>
                 {section.items.map((item) => (
                   <NavLink
                     key={item.name}
                     to={item.href}
+                    onClick={onNavigate}
                     className={({ isActive }) =>
-                      `flex items-center ${isOpen ? 'space-x-3 px-3 py-2.5' : 'px-2 py-4 justify-center'} rounded-lg transition-all duration-200 group relative ${
-                        isActive
+                      `flex items-center rounded-lg transition-all duration-200 group relative
+                      ${isOpen ? 'space-x-3 px-3 py-2.5' : 'lg:px-2 lg:py-4 lg:justify-center px-3 py-2.5 space-x-3'}
+                      ${isActive
                           ? 'bg-orange-500 text-white shadow-lg'
                           : 'text-blue-100 hover:bg-blue-800 hover:text-white'
                       }`
                     }
                     title={!isOpen ? item.name : item.description}
                   >
-                    <item.icon className={`${isOpen ? 'w-5 h-5' : 'w-6 h-6'} flex-shrink-0`} />
-                    {isOpen && (
+                    <item.icon className={`${isOpen ? 'w-5 h-5' : 'lg:w-6 lg:h-6 w-5 h-5'} flex-shrink-0`} />
+                    {(isOpen || window.innerWidth < 1024) && (
                       <div className="flex-1 flex items-center justify-between">
                         <span className="font-medium text-sm">{item.name}</span>
                         {item.badge && (
@@ -185,7 +214,7 @@ const Sidebar = ({ isOpen, userRole }) => {
                         )}
                       </div>
                     )}
-                    {!isOpen && (
+                    {!isOpen && window.innerWidth >= 1024 && (
                       <span className="absolute left-16 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                         {item.name}
                         {item.badge && ` (${item.badge})`}
@@ -196,7 +225,7 @@ const Sidebar = ({ isOpen, userRole }) => {
               </div>
               
               {/* Section Divider */}
-              {isOpen && sectionIndex < filteredSections.length - 1 && (
+              {(isOpen || window.innerWidth < 1024) && sectionIndex < filteredSections.length - 1 && (
                 <div className="mt-4 border-t border-blue-800/50"></div>
               )}
             </div>

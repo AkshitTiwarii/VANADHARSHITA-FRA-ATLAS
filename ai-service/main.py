@@ -1,6 +1,6 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import pytesseract
 from PIL import Image
 import cv2
@@ -11,6 +11,11 @@ import aiofiles
 import logging
 from datetime import datetime
 import json
+import hashlib
+import asyncio
+import requests
+from typing import List, Dict
+from collections import deque
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -620,11 +625,67 @@ async def get_processing_stats():
 # Simple in-memory storage for alerts and monitoring locations
 monitoring_alerts = []
 monitoring_locations_db = [
-    # Default monitoring locations
+    # Maharashtra - Gadchiroli District (Original + Expanded)
     {"id": "LOC-001", "village": "Bhamragad", "district": "Gadchiroli", "state": "Maharashtra", "lat": 18.9217, "lon": 77.0038, "added_date": "2025-10-01"},
     {"id": "LOC-002", "village": "Korchi", "district": "Gadchiroli", "state": "Maharashtra", "lat": 20.0931, "lon": 79.8794, "added_date": "2025-10-01"},
     {"id": "LOC-003", "village": "Dhanora", "district": "Gadchiroli", "state": "Maharashtra", "lat": 19.9503, "lon": 80.0342, "added_date": "2025-10-01"},
     {"id": "LOC-004", "village": "Aheri", "district": "Gadchiroli", "state": "Maharashtra", "lat": 19.5854, "lon": 79.9988, "added_date": "2025-10-01"},
+    {"id": "LOC-005", "village": "Etapalli", "district": "Gadchiroli", "state": "Maharashtra", "lat": 19.9875, "lon": 80.0589, "added_date": "2025-10-01"},
+    
+    # Madhya Pradesh - Tribal Belts
+    {"id": "LOC-006", "village": "Balaghat", "district": "Balaghat", "state": "Madhya Pradesh", "lat": 21.8087, "lon": 80.1869, "added_date": "2025-10-01"},
+    {"id": "LOC-007", "village": "Mandla", "district": "Mandla", "state": "Madhya Pradesh", "lat": 22.5993, "lon": 80.3711, "added_date": "2025-10-01"},
+    {"id": "LOC-008", "village": "Dindori", "district": "Dindori", "state": "Madhya Pradesh", "lat": 22.9414, "lon": 81.0792, "added_date": "2025-10-01"},
+    {"id": "LOC-009", "village": "Jhabua", "district": "Jhabua", "state": "Madhya Pradesh", "lat": 22.7676, "lon": 74.5911, "added_date": "2025-10-01"},
+    {"id": "LOC-010", "village": "Alirajpur", "district": "Alirajpur", "state": "Madhya Pradesh", "lat": 22.3045, "lon": 74.3619, "added_date": "2025-10-01"},
+    {"id": "LOC-011", "village": "Betul", "district": "Betul", "state": "Madhya Pradesh", "lat": 21.9011, "lon": 77.8989, "added_date": "2025-10-01"},
+    {"id": "LOC-012", "village": "Chhindwara", "district": "Chhindwara", "state": "Madhya Pradesh", "lat": 22.0576, "lon": 78.9384, "added_date": "2025-10-01"},
+    
+    # Odisha - Dense Forest Regions
+    {"id": "LOC-013", "village": "Kalahandi", "district": "Kalahandi", "state": "Odisha", "lat": 19.9143, "lon": 83.1645, "added_date": "2025-10-01"},
+    {"id": "LOC-014", "village": "Koraput", "district": "Koraput", "state": "Odisha", "lat": 18.8132, "lon": 82.7109, "added_date": "2025-10-01"},
+    {"id": "LOC-015", "village": "Rayagada", "district": "Rayagada", "state": "Odisha", "lat": 19.1678, "lon": 83.4142, "added_date": "2025-10-01"},
+    {"id": "LOC-016", "village": "Malkangiri", "district": "Malkangiri", "state": "Odisha", "lat": 18.3479, "lon": 81.8896, "added_date": "2025-10-01"},
+    {"id": "LOC-017", "village": "Nabarangpur", "district": "Nabarangpur", "state": "Odisha", "lat": 19.2306, "lon": 82.5456, "added_date": "2025-10-01"},
+    {"id": "LOC-018", "village": "Kandhamal", "district": "Kandhamal", "state": "Odisha", "lat": 20.1473, "lon": 84.1355, "added_date": "2025-10-01"},
+    {"id": "LOC-019", "village": "Sundargarh", "district": "Sundargarh", "state": "Odisha", "lat": 22.1185, "lon": 84.0354, "added_date": "2025-10-01"},
+    
+    # Telangana - Forest Regions
+    {"id": "LOC-020", "village": "Adilabad", "district": "Adilabad", "state": "Telangana", "lat": 19.6683, "lon": 78.5319, "added_date": "2025-10-01"},
+    {"id": "LOC-021", "village": "Khammam", "district": "Khammam", "state": "Telangana", "lat": 17.2473, "lon": 80.1514, "added_date": "2025-10-01"},
+    {"id": "LOC-022", "village": "Warangal", "district": "Warangal", "state": "Telangana", "lat": 17.9784, "lon": 79.5941, "added_date": "2025-10-01"},
+    {"id": "LOC-023", "village": "Bhadradri Kothagudem", "district": "Bhadradri Kothagudem", "state": "Telangana", "lat": 17.5501, "lon": 80.6186, "added_date": "2025-10-01"},
+    {"id": "LOC-024", "village": "Mancherial", "district": "Mancherial", "state": "Telangana", "lat": 18.8718, "lon": 79.4632, "added_date": "2025-10-01"},
+    
+    # Tripura - Forest Areas
+    {"id": "LOC-025", "village": "Dhalai", "district": "Dhalai", "state": "Tripura", "lat": 23.8373, "lon": 91.9352, "added_date": "2025-10-01"},
+    {"id": "LOC-026", "village": "North Tripura", "district": "North Tripura", "state": "Tripura", "lat": 23.9651, "lon": 91.9800, "added_date": "2025-10-01"},
+    {"id": "LOC-027", "village": "Khowai", "district": "Khowai", "state": "Tripura", "lat": 24.0698, "lon": 91.6059, "added_date": "2025-10-01"},
+    {"id": "LOC-028", "village": "Gomati", "district": "Gomati", "state": "Tripura", "lat": 23.5316, "lon": 91.4715, "added_date": "2025-10-01"},
+    
+    # Chhattisgarh - Critical Forest Areas
+    {"id": "LOC-029", "village": "Bastar", "district": "Bastar", "state": "Chhattisgarh", "lat": 19.0757, "lon": 81.9544, "added_date": "2025-10-01"},
+    {"id": "LOC-030", "village": "Dantewada", "district": "Dantewada", "state": "Chhattisgarh", "lat": 18.8932, "lon": 81.3525, "added_date": "2025-10-01"},
+    {"id": "LOC-031", "village": "Kanker", "district": "Kanker", "state": "Chhattisgarh", "lat": 20.2713, "lon": 81.4932, "added_date": "2025-10-01"},
+    {"id": "LOC-032", "village": "Surguja", "district": "Surguja", "state": "Chhattisgarh", "lat": 23.1190, "lon": 83.1976, "added_date": "2025-10-01"},
+    
+    # Jharkhand - Tribal Forest Regions
+    {"id": "LOC-033", "village": "Gumla", "district": "Gumla", "state": "Jharkhand", "lat": 23.0438, "lon": 84.5383, "added_date": "2025-10-01"},
+    {"id": "LOC-034", "village": "Lohardaga", "district": "Lohardaga", "state": "Jharkhand", "lat": 23.4341, "lon": 84.6805, "added_date": "2025-10-01"},
+    {"id": "LOC-035", "village": "Simdega", "district": "Simdega", "state": "Jharkhand", "lat": 22.6186, "lon": 84.5022, "added_date": "2025-10-01"},
+    
+    # Andhra Pradesh - Forest Regions
+    {"id": "LOC-036", "village": "Visakhapatnam Agency", "district": "Visakhapatnam", "state": "Andhra Pradesh", "lat": 17.8041, "lon": 82.7914, "added_date": "2025-10-01"},
+    {"id": "LOC-037", "village": "East Godavari", "district": "East Godavari", "state": "Andhra Pradesh", "lat": 17.2840, "lon": 81.9849, "added_date": "2025-10-01"},
+    {"id": "LOC-038", "village": "Srikakulam", "district": "Srikakulam", "state": "Andhra Pradesh", "lat": 18.2949, "lon": 83.8974, "added_date": "2025-10-01"},
+    
+    # Western Ghats - Karnataka
+    {"id": "LOC-039", "village": "Uttara Kannada", "district": "Uttara Kannada", "state": "Karnataka", "lat": 14.7951, "lon": 74.6869, "added_date": "2025-10-01"},
+    {"id": "LOC-040", "village": "Kodagu", "district": "Kodagu", "state": "Karnataka", "lat": 12.4244, "lon": 75.7382, "added_date": "2025-10-01"},
+    
+    # Kerala - Western Ghats
+    {"id": "LOC-041", "village": "Wayanad", "district": "Wayanad", "state": "Kerala", "lat": 11.6854, "lon": 76.1320, "added_date": "2025-10-01"},
+    {"id": "LOC-042", "village": "Idukki", "district": "Idukki", "state": "Kerala", "lat": 9.9189, "lon": 77.0989, "added_date": "2025-10-01"},
 ]
 
 # ============================================
@@ -1067,24 +1128,798 @@ async def extract_ocr_data(file: UploadFile = File(...)):
         )
 
 
+# ==================== COMPREHENSIVE DOCUMENT VERIFICATION WORKFLOW ====================
+
+# In-memory storage for document workflow tracking
+document_workflows = []
+officer_reports = []
+
+# Real-time event stream for officers
+realtime_events = deque(maxlen=100)  # Keep last 100 events
+active_connections: List[asyncio.Queue] = []
+
+class DocumentWorkflowStatus:
+    """Document workflow status tracking"""
+    UPLOADED = "uploaded"
+    BLOCKCHAIN_VERIFICATION = "blockchain_verification"
+    BLOCKCHAIN_FAILED = "blockchain_failed"
+    BLOCKCHAIN_VERIFIED = "blockchain_verified"
+    PENDING_LOCATION_CHECK = "pending_location_check"
+    LOCATION_CONTRADICTION = "location_contradiction"
+    MANUAL_REVIEW = "manual_review"
+    DSS_EVALUATION = "dss_evaluation"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+# ==================== REAL-TIME EVENT BROADCASTING ====================
+
+async def broadcast_event(event_type: str, workflow_id: str, data: dict):
+    """Broadcast real-time event to all connected officers"""
+    event = {
+        "event_type": event_type,
+        "workflow_id": workflow_id,
+        "timestamp": datetime.now().isoformat(),
+        "data": data
+    }
+    
+    # Store in recent events
+    realtime_events.append(event)
+    
+    # Broadcast to all active connections
+    disconnected = []
+    for queue in active_connections:
+        try:
+            await queue.put(event)
+        except:
+            disconnected.append(queue)
+    
+    # Remove disconnected clients
+    for queue in disconnected:
+        if queue in active_connections:
+            active_connections.remove(queue)
+    
+    logger.info(f"📡 Broadcasted event: {event_type} for {workflow_id} to {len(active_connections)} officers")
+
+
+async def event_generator():
+    """Generate Server-Sent Events for real-time updates"""
+    queue = asyncio.Queue()
+    active_connections.append(queue)
+    
+    try:
+        # Send initial connection message
+        yield f"data: {json.dumps({'event_type': 'connected', 'message': 'Real-time monitoring active', 'timestamp': datetime.now().isoformat()})}\n\n"
+        
+        # Send recent events (last 10)
+        recent = list(realtime_events)[-10:]
+        for event in recent:
+            yield f"data: {json.dumps(event)}\n\n"
+        
+        # Stream new events
+        while True:
+            event = await queue.get()
+            yield f"data: {json.dumps(event)}\n\n"
+            
+    except asyncio.CancelledError:
+        pass
+    finally:
+        if queue in active_connections:
+            active_connections.remove(queue)
+
+
+@app.get("/api/officer/realtime-events")
+async def realtime_events_stream():
+    """
+    Server-Sent Events endpoint for real-time workflow monitoring
+    Officers can connect to this to receive live updates
+    """
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+@app.get("/api/officer/recent-events")
+async def get_recent_events(limit: int = 50):
+    """Get recent real-time events (last 50 by default)"""
+    recent = list(realtime_events)[-limit:]
+    return {
+        "success": True,
+        "total": len(recent),
+        "events": recent,
+        "active_connections": len(active_connections)
+    }
+
+
+# ==================== END OF REAL-TIME BROADCASTING ====================
+
+@app.post("/api/document/comprehensive-verification")
+async def comprehensive_document_verification(
+    file: UploadFile = File(...),
+    applicant_name: str = Form(...),
+    applicant_location: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    language: str = Form(default="auto")
+):
+    """
+    Comprehensive Document Verification Workflow
+    
+    Flow:
+    1. Upload → Blockchain verification
+    2. Blockchain Fail → Report to officer
+    3. Blockchain Pass → Create Hyperledger hash
+    4. Status → "Pending"
+    5. Location Verification → Earth Engine/Bhuvan matching
+    6. Contradiction Found → Manual review
+    7. No Contradiction → DSS eligibility check
+    8. End → Final status update
+    """
+    
+    workflow_id = f"WF-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(document_workflows) + 1:04d}"
+    
+    workflow = {
+        "workflow_id": workflow_id,
+        "applicant_name": applicant_name,
+        "applicant_location": applicant_location,
+        "latitude": latitude,
+        "longitude": longitude,
+        "status": DocumentWorkflowStatus.UPLOADED,
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+        "steps": [],
+        "blockchain_hash": None,
+        "hyperledger_hash": None,
+        "location_match_score": None,
+        "dss_recommendation": None,
+        "final_decision": None
+    }
+    
+    try:
+        # ========== STEP 1: Save and Process Document ==========
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{file.filename}"
+        file_path = os.path.join("uploads", filename)
+        
+        async with aiofiles.open(file_path, 'wb') as f:
+            content = await file.read()
+            await f.write(content)
+        
+        workflow["steps"].append({
+            "step": "document_upload",
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "filename": filename
+        })
+        
+        # 📡 BROADCAST: Document uploaded
+        await broadcast_event(
+            "document_uploaded",
+            workflow_id,
+            {
+                "applicant_name": applicant_name,
+                "applicant_location": applicant_location,
+                "filename": filename,
+                "message": f"Document uploaded by {applicant_name}"
+            }
+        )
+        
+        # Extract text from document
+        extracted_text, detected_language = processor.extract_text_from_image(file_path, language)
+        form_type, confidence = processor.detect_form_type(extracted_text)
+        entities = processor.extract_entities(extracted_text, form_type)
+        
+        workflow["document_data"] = {
+            "filename": filename,
+            "extracted_text": extracted_text[:200] + "..." if len(extracted_text) > 200 else extracted_text,
+            "form_type": form_type,
+            "confidence": confidence,
+            "entities": entities
+        }
+        
+        # ========== STEP 2: Blockchain Verification ==========
+        workflow["status"] = DocumentWorkflowStatus.BLOCKCHAIN_VERIFICATION
+        workflow["updated_at"] = datetime.now().isoformat()
+        
+        # Call blockchain service for verification
+        blockchain_url = "http://localhost:8001/api/submit-verification"
+        
+        # 📡 BROADCAST: Starting blockchain verification
+        await broadcast_event(
+            "blockchain_verification_started",
+            workflow_id,
+            {
+                "applicant_name": applicant_name,
+                "document_type": form_type,
+                "message": "Starting blockchain verification..."
+            }
+        )
+        
+        try:
+            blockchain_response = await asyncio.to_thread(
+                requests.post,
+                blockchain_url,
+                json={
+                    "documentHash": hashlib.sha256(content).hexdigest(),
+                    "applicantName": applicant_name,
+                    "location": applicant_location,
+                    "documentType": form_type,
+                    "metadata": {
+                        "latitude": latitude,
+                        "longitude": longitude,
+                        "entities": entities
+                    }
+                },
+                timeout=10
+            )
+            
+            if blockchain_response.status_code == 200:
+                blockchain_data = blockchain_response.json()
+                
+                # Check if blockchain verification passed
+                if blockchain_data.get("verified", False):
+                    workflow["status"] = DocumentWorkflowStatus.BLOCKCHAIN_VERIFIED
+                    workflow["blockchain_hash"] = blockchain_data.get("transactionId")
+                    
+                    workflow["steps"].append({
+                        "step": "blockchain_verification",
+                        "status": "success",
+                        "timestamp": datetime.now().isoformat(),
+                        "transaction_id": blockchain_data.get("transactionId"),
+                        "block_number": blockchain_data.get("blockNumber")
+                    })
+                    
+                    # 📡 BROADCAST: Blockchain verified
+                    await broadcast_event(
+                        "blockchain_verified",
+                        workflow_id,
+                        {
+                            "transaction_id": blockchain_data.get("transactionId"),
+                            "block_number": blockchain_data.get("blockNumber"),
+                            "message": "✅ Blockchain verification successful"
+                        }
+                    )
+                    
+                    # ========== STEP 3: Create Hyperledger Hash ==========
+                    hyperledger_hash = hashlib.sha256(
+                        f"{workflow_id}-{applicant_name}-{datetime.now().isoformat()}".encode()
+                    ).hexdigest()
+                    
+                    workflow["hyperledger_hash"] = hyperledger_hash
+                    workflow["steps"].append({
+                        "step": "hyperledger_hash_created",
+                        "status": "success",
+                        "timestamp": datetime.now().isoformat(),
+                        "hash": hyperledger_hash
+                    })
+                    
+                    # 📡 BROADCAST: Hyperledger hash created
+                    await broadcast_event(
+                        "hyperledger_hash_created",
+                        workflow_id,
+                        {
+                            "hash": hyperledger_hash[:16] + "...",
+                            "message": "Hyperledger hash generated"
+                        }
+                    )
+                    
+                    # ========== STEP 4: Set Status to Pending ==========
+                    workflow["status"] = DocumentWorkflowStatus.PENDING_LOCATION_CHECK
+                    workflow["updated_at"] = datetime.now().isoformat()
+                    
+                    # 📡 BROADCAST: Status pending location check
+                    await broadcast_event(
+                        "status_pending_location",
+                        workflow_id,
+                        {
+                            "message": "Awaiting location verification..."
+                        }
+                    )
+                    
+                else:
+                    # Blockchain verification failed
+                    workflow["status"] = DocumentWorkflowStatus.BLOCKCHAIN_FAILED
+                    workflow["steps"].append({
+                        "step": "blockchain_verification",
+                        "status": "failed",
+                        "timestamp": datetime.now().isoformat(),
+                        "reason": blockchain_data.get("message", "Verification failed")
+                    })
+                    
+                    # 📡 BROADCAST: Blockchain failed
+                    await broadcast_event(
+                        "blockchain_failed",
+                        workflow_id,
+                        {
+                            "reason": blockchain_data.get("message", "Verification failed"),
+                            "message": "❌ Blockchain verification failed"
+                        }
+                    )
+                    
+                    # ========== Report to Officer ==========
+                    officer_report = {
+                        "report_id": f"RPT-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(officer_reports) + 1:04d}",
+                        "workflow_id": workflow_id,
+                        "applicant_name": applicant_name,
+                        "issue_type": "blockchain_verification_failed",
+                        "details": blockchain_data.get("message", "Blockchain verification failed"),
+                        "priority": "high",
+                        "status": "pending_review",
+                        "created_at": datetime.now().isoformat()
+                    }
+                    officer_reports.append(officer_report)
+                    
+                    workflow["officer_report_id"] = officer_report["report_id"]
+                    
+                    # 📡 BROADCAST: Officer report created
+                    await broadcast_event(
+                        "officer_report_created",
+                        workflow_id,
+                        {
+                            "report_id": officer_report["report_id"],
+                            "issue_type": "blockchain_verification_failed",
+                            "message": "Report sent to officer for review"
+                        }
+                    )
+                    
+                    document_workflows.append(workflow)
+                    
+                    return {
+                        "success": False,
+                        "workflow_id": workflow_id,
+                        "status": "blockchain_failed",
+                        "message": "Blockchain verification failed. Reported to officer for review.",
+                        "officer_report_id": officer_report["report_id"],
+                        "workflow": workflow
+                    }
+        
+        except Exception as blockchain_error:
+            logger.error(f"Blockchain service error: {blockchain_error}")
+            # If blockchain service is down, report to officer
+            workflow["status"] = DocumentWorkflowStatus.BLOCKCHAIN_FAILED
+            workflow["steps"].append({
+                "step": "blockchain_verification",
+                "status": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(blockchain_error)
+            })
+            
+            officer_report = {
+                "report_id": f"RPT-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(officer_reports) + 1:04d}",
+                "workflow_id": workflow_id,
+                "applicant_name": applicant_name,
+                "issue_type": "blockchain_service_error",
+                "details": f"Blockchain service unavailable: {str(blockchain_error)}",
+                "priority": "high",
+                "status": "pending_review",
+                "created_at": datetime.now().isoformat()
+            }
+            officer_reports.append(officer_report)
+            workflow["officer_report_id"] = officer_report["report_id"]
+        
+        # ========== STEP 5: Location Verification (Earth Engine / Bhuvan) ==========
+        if workflow["status"] == DocumentWorkflowStatus.PENDING_LOCATION_CHECK:
+            # 📡 BROADCAST: Starting location verification
+            await broadcast_event(
+                "location_verification_started",
+                workflow_id,
+                {
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "message": "Analyzing satellite imagery..."
+                }
+            )
+            
+            # Analyze satellite imagery for the claimed location
+            satellite_analysis = await analyze_satellite({
+                "latitude": latitude,
+                "longitude": longitude,
+                "radius": 500
+            })
+            
+            # Check for contradictions
+            # Logic: If NDVI is too low or land type doesn't match forest, flag contradiction
+            ndvi = satellite_analysis.get("ndvi", 0)
+            land_type = satellite_analysis.get("land_type", "")
+            
+            contradiction_found = False
+            contradiction_reasons = []
+            
+            # Check 1: NDVI too low (barren land)
+            if ndvi < 0.2:
+                contradiction_found = True
+                contradiction_reasons.append(f"Low vegetation index (NDVI: {ndvi:.2f}). Area appears barren.")
+            
+            # Check 2: Non-forest land type
+            if land_type.lower() not in ["forest", "dense_vegetation", "woodland"]:
+                contradiction_found = True
+                contradiction_reasons.append(f"Land type mismatch. Detected: {land_type}")
+            
+            # Check 3: Check against existing monitoring locations
+            location_match_found = False
+            match_score = 0
+            
+            for loc in monitoring_locations_db:
+                # Calculate distance (simple approximation)
+                loc_lat = loc["lat"]
+                loc_lon = loc["lon"]
+                distance = ((latitude - loc_lat) ** 2 + (longitude - loc_lon) ** 2) ** 0.5 * 111  # km
+                
+                if distance < 5:  # Within 5 km
+                    location_match_found = True
+                    match_score = max(match_score, (5 - distance) / 5 * 100)
+            
+            workflow["location_match_score"] = round(match_score, 2)
+            workflow["satellite_analysis"] = {
+                "ndvi": ndvi,
+                "land_type": land_type,
+                "location_match_found": location_match_found
+            }
+            
+            workflow["steps"].append({
+                "step": "location_verification",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "ndvi": ndvi,
+                "land_type": land_type,
+                "match_score": match_score,
+                "contradiction_found": contradiction_found
+            })
+            
+            if contradiction_found:
+                # 📡 BROADCAST: Location contradiction detected
+                await broadcast_event(
+                    "location_contradiction",
+                    workflow_id,
+                    {
+                        "reasons": contradiction_reasons,
+                        "ndvi": ndvi,
+                        "land_type": land_type,
+                        "message": "⚠️ Location contradiction detected"
+                    }
+                )
+                
+                # ========== STEP 6: Manual Review Required ==========
+                workflow["status"] = DocumentWorkflowStatus.MANUAL_REVIEW
+                workflow["updated_at"] = datetime.now().isoformat()
+                
+                officer_report = {
+                    "report_id": f"RPT-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(officer_reports) + 1:04d}",
+                    "workflow_id": workflow_id,
+                    "applicant_name": applicant_name,
+                    "issue_type": "location_contradiction",
+                    "details": " | ".join(contradiction_reasons),
+                    "priority": "medium",
+                    "status": "pending_review",
+                    "created_at": datetime.now().isoformat(),
+                    "location": {
+                        "latitude": latitude,
+                        "longitude": longitude,
+                        "ndvi": ndvi,
+                        "land_type": land_type
+                    }
+                }
+                officer_reports.append(officer_report)
+                workflow["officer_report_id"] = officer_report["report_id"]
+                
+                # 📡 BROADCAST: Officer report created
+                await broadcast_event(
+                    "officer_report_created",
+                    workflow_id,
+                    {
+                        "report_id": officer_report["report_id"],
+                        "issue_type": "location_contradiction",
+                        "message": "Report sent to officer for manual review"
+                    }
+                )
+                
+                document_workflows.append(workflow)
+                
+                return {
+                    "success": True,
+                    "workflow_id": workflow_id,
+                    "status": "manual_review_required",
+                    "message": "Location contradiction detected. Sent for manual review.",
+                    "contradictions": contradiction_reasons,
+                    "officer_report_id": officer_report["report_id"],
+                    "workflow": workflow
+                }
+            
+            else:
+                # 📡 BROADCAST: Location verified
+                await broadcast_event(
+                    "location_verified",
+                    workflow_id,
+                    {
+                        "ndvi": ndvi,
+                        "land_type": land_type,
+                        "match_score": match_score,
+                        "message": "✅ Location verification successful"
+                    }
+                )
+                
+                # ========== STEP 7: DSS Eligibility Check ==========
+                workflow["status"] = DocumentWorkflowStatus.DSS_EVALUATION
+                workflow["updated_at"] = datetime.now().isoformat()
+                
+                # 📡 BROADCAST: DSS evaluation started
+                await broadcast_event(
+                    "dss_evaluation_started",
+                    workflow_id,
+                    {
+                        "message": "Evaluating DSS eligibility criteria..."
+                    }
+                )
+                
+                # Simplified DSS logic
+                dss_score = 0
+                dss_factors = []
+                
+                # Factor 1: NDVI (vegetation health)
+                if ndvi > 0.6:
+                    dss_score += 30
+                    dss_factors.append("Good vegetation health")
+                elif ndvi > 0.4:
+                    dss_score += 20
+                    dss_factors.append("Moderate vegetation")
+                else:
+                    dss_score += 10
+                    dss_factors.append("Low vegetation")
+                
+                # Factor 2: Location match
+                if location_match_found:
+                    dss_score += 25
+                    dss_factors.append("Location within monitored forest area")
+                
+                # Factor 3: Document confidence
+                if confidence > 0.8:
+                    dss_score += 25
+                    dss_factors.append("High document authenticity")
+                elif confidence > 0.6:
+                    dss_score += 15
+                    dss_factors.append("Moderate document confidence")
+                
+                # Factor 4: Blockchain verified
+                dss_score += 20
+                dss_factors.append("Blockchain verified")
+                
+                # Determine eligibility
+                eligible_schemes = []
+                
+                if dss_score >= 80:
+                    eligible_schemes = ["Community Forest Rights (CFR)", "Individual Forest Rights (IFR)", "Forest Dwelling Certificate"]
+                    recommendation = "Highly eligible"
+                elif dss_score >= 60:
+                    eligible_schemes = ["Individual Forest Rights (IFR)", "Forest Dwelling Certificate"]
+                    recommendation = "Eligible with conditions"
+                else:
+                    eligible_schemes = []
+                    recommendation = "Additional verification required"
+                
+                workflow["dss_recommendation"] = {
+                    "score": dss_score,
+                    "recommendation": recommendation,
+                    "eligible_schemes": eligible_schemes,
+                    "factors": dss_factors
+                }
+                
+                workflow["steps"].append({
+                    "step": "dss_evaluation",
+                    "status": "completed",
+                    "timestamp": datetime.now().isoformat(),
+                    "score": dss_score,
+                    "recommendation": recommendation,
+                    "schemes": eligible_schemes
+                })
+                
+                # 📡 BROADCAST: DSS evaluation complete
+                await broadcast_event(
+                    "dss_evaluation_complete",
+                    workflow_id,
+                    {
+                        "score": dss_score,
+                        "recommendation": recommendation,
+                        "eligible_schemes": eligible_schemes,
+                        "message": f"DSS Score: {dss_score}/100 - {recommendation}"
+                    }
+                )
+                
+                # ========== STEP 8: Final Decision ==========
+                if dss_score >= 60:
+                    workflow["status"] = DocumentWorkflowStatus.APPROVED
+                    workflow["final_decision"] = "approved"
+                    
+                    # 📡 BROADCAST: Workflow approved
+                    await broadcast_event(
+                        "workflow_approved",
+                        workflow_id,
+                        {
+                            "dss_score": dss_score,
+                            "eligible_schemes": eligible_schemes,
+                            "message": "✅ Workflow approved! Eligible for forest rights."
+                        }
+                    )
+                else:
+                    workflow["status"] = DocumentWorkflowStatus.MANUAL_REVIEW
+                    workflow["final_decision"] = "requires_review"
+                    
+                    # 📡 BROADCAST: Manual review required
+                    await broadcast_event(
+                        "workflow_manual_review",
+                        workflow_id,
+                        {
+                            "dss_score": dss_score,
+                            "message": "⚠️ Manual review required (DSS score < 60)"
+                        }
+                    )
+                
+                workflow["updated_at"] = datetime.now().isoformat()
+        
+        # Save workflow
+        document_workflows.append(workflow)
+        
+        # Clean up file
+        try:
+            os.remove(file_path)
+        except:
+            pass
+        
+        return {
+            "success": True,
+            "workflow_id": workflow_id,
+            "status": workflow["status"],
+            "message": "Document verification workflow completed successfully",
+            "workflow": workflow,
+            "blockchain_hash": workflow.get("blockchain_hash"),
+            "hyperledger_hash": workflow.get("hyperledger_hash"),
+            "location_match_score": workflow.get("location_match_score"),
+            "dss_recommendation": workflow.get("dss_recommendation"),
+            "final_decision": workflow.get("final_decision")
+        }
+    
+    except Exception as e:
+        logger.error(f"Comprehensive verification error: {str(e)}")
+        
+        workflow["status"] = "error"
+        workflow["error"] = str(e)
+        document_workflows.append(workflow)
+        
+        raise HTTPException(status_code=500, detail=f"Verification workflow failed: {str(e)}")
+
+
+@app.get("/api/document/workflow/{workflow_id}")
+async def get_workflow_status(workflow_id: str):
+    """Get document workflow status by ID"""
+    for workflow in document_workflows:
+        if workflow["workflow_id"] == workflow_id:
+            return {
+                "success": True,
+                "workflow": workflow
+            }
+    
+    raise HTTPException(status_code=404, detail="Workflow not found")
+
+
+@app.get("/api/document/workflows")
+async def get_all_workflows(
+    status: str = None,
+    limit: int = 50
+):
+    """Get all document workflows with optional status filter"""
+    filtered_workflows = document_workflows
+    
+    if status:
+        filtered_workflows = [w for w in document_workflows if w["status"] == status]
+    
+    return {
+        "success": True,
+        "total": len(filtered_workflows),
+        "workflows": filtered_workflows[-limit:]
+    }
+
+
+@app.get("/api/officer/reports")
+async def get_officer_reports(
+    status: str = None,
+    priority: str = None,
+    limit: int = 50
+):
+    """Get officer reports with optional filters"""
+    filtered_reports = officer_reports
+    
+    if status:
+        filtered_reports = [r for r in filtered_reports if r["status"] == status]
+    
+    if priority:
+        filtered_reports = [r for r in filtered_reports if r["priority"] == priority]
+    
+    return {
+        "success": True,
+        "total": len(filtered_reports),
+        "reports": filtered_reports[-limit:]
+    }
+
+
+@app.post("/api/officer/report/{report_id}/resolve")
+async def resolve_officer_report(
+    report_id: str,
+    resolution: str,
+    action_taken: str
+):
+    """Resolve an officer report"""
+    for report in officer_reports:
+        if report["report_id"] == report_id:
+            report["status"] = "resolved"
+            report["resolution"] = resolution
+            report["action_taken"] = action_taken
+            report["resolved_at"] = datetime.now().isoformat()
+            
+            return {
+                "success": True,
+                "message": "Report resolved successfully",
+                "report": report
+            }
+    
+    raise HTTPException(status_code=404, detail="Report not found")
+
+
+# ==================== END OF DOCUMENT VERIFICATION WORKFLOW ====================
+
+
 if __name__ == "__main__":
     import uvicorn
+    import sys
     
-    print("🤖 Starting FRA Atlas AI Service...")
-    print(f"📄 OCR Engine: {'✅ Tesseract (Real OCR)' if TESSERACT_AVAILABLE else '⚠️ Mock Mode (Tesseract not found)'}")
-    print("🛰️ Satellite Analysis: Enabled")
-    print("🌲 Forest Monitoring: Enabled")
-    print("🌐 CORS: Enabled for all origins")
-    print("📊 Endpoints:")
-    print("  - POST /api/process-document")
+    # Fix Unicode encoding for Windows console
+    if sys.platform == 'win32':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except:
+            pass
+    
+    print("Starting FRA Atlas AI Service...")
+    print(f"OCR Engine: {'Tesseract (Real OCR)' if TESSERACT_AVAILABLE else 'Mock Mode (Tesseract not found)'}")
+    print("Satellite Analysis: Enabled")
+    print("Forest Monitoring: Enabled")
+    print("Blockchain Integration: Enabled")
+    print("CORS: Enabled for all origins")
+    print("Real-time Officer Monitoring: Enabled (SSE)")
+    print("")
+    print("Document Processing Endpoints:")
+    print("  - POST /api/process-document (Basic document processing)")
     print("  - POST /api/ocr/extract (Citizen Portal Auto-fill)")
+    print("  - POST /api/document/comprehensive-verification (Full workflow)")
+    print("  - GET  /api/document/workflow/{workflow_id}")
+    print("  - GET  /api/document/workflows")
+    print("")
+    print("Satellite & Monitoring:")
     print("  - POST /api/analyze-satellite")
     print("  - POST /api/monitoring/run-cycle")
-    print("  - GET /api/monitoring/alerts")
-    print("  - GET /api/monitoring/statistics")
-    print("  - POST /api/monitoring/test-alert") 
-    print("  - GET /api/stats")
-    print("  - GET /health")
+    print("  - GET  /api/monitoring/alerts")
+    print("  - GET  /api/monitoring/statistics")
+    print("  - POST /api/monitoring/test-alert")
+    print("")
+    print("Officer Reports:")
+    print("  - GET  /api/officer/reports")
+    print("  - POST /api/officer/report/{report_id}/resolve")
+    print("")
+    print("Real-time Monitoring (NEW):")
+    print("  - GET  /api/officer/realtime-events (SSE Stream)")
+    print("  - GET  /api/officer/recent-events (Event History)")
+    print("")
+    print("System:")
+    print("  - GET  /api/stats")
+    print("  - GET  /health")
+    print("")
+    print("Server running on http://localhost:8000")
+    print("API Docs: http://localhost:8000/docs")
+    print("Real-time Dashboard: officer_realtime_dashboard.html")
     
     uvicorn.run(
         "main:app",

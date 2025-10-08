@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -52,6 +52,7 @@ const mapOptions = {
 
 const ForestMonitoringDashboard = () => {
   const navigate = useNavigate();
+  const mapRef = useRef(null); // Reference to map section
   const [alerts, setAlerts] = useState([]);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -258,49 +259,51 @@ const ForestMonitoringDashboard = () => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8 space-y-4">
         {/* Back Button */}
-        <div className="mb-4">
+        <div>
           <Button
             variant="outline"
             onClick={() => navigate('/')}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-xs sm:text-sm"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
+            <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Back to Dashboard</span>
+            <span className="sm:hidden">Back</span>
           </Button>
         </div>
         
         {/* Title and Actions Row */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Satellite className="w-8 h-8 text-blue-600" />
-              Forest Monitoring Dashboard
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 sm:gap-3">
+              <Satellite className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-blue-600 flex-shrink-0" />
+              <span className="truncate">Forest Monitoring Dashboard</span>
             </h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-xs sm:text-sm md:text-base text-gray-600 mt-1 sm:mt-2">
               Real-time deforestation detection using satellite imagery
             </p>
           </div>
           
-          <div className="flex flex-wrap gap-2 items-start">
+          <div className="flex flex-wrap gap-2 items-start w-full sm:w-auto">
             <Button
               variant="default"
               onClick={() => setShowManageLocations(true)}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm flex-1 sm:flex-initial"
             >
-              <Settings className="w-4 h-4 mr-2" />
-              Manage Locations
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Manage Locations</span>
+              <span className="sm:hidden">Manage</span>
             </Button>
             
             <Button
               variant={showMap ? 'default' : 'outline'}
               onClick={toggleMapView}
-              className={showMap ? 'bg-green-600 hover:bg-green-700' : ''}
+              className={`${showMap ? 'bg-green-600 hover:bg-green-700' : ''} text-xs sm:text-sm flex-1 sm:flex-initial`}
             >
-              <MapIcon className="w-4 h-4 mr-2" />
+              <MapIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               {showMap ? 'Hide' : 'Show'} Map
             </Button>
             
@@ -308,33 +311,37 @@ const ForestMonitoringDashboard = () => {
               variant="outline"
               onClick={fetchAlerts}
               disabled={loading}
+              className="text-xs sm:text-sm"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
             </Button>
             
             <Button
               variant="outline"
               onClick={sendTestAlert}
+              className="text-xs sm:text-sm hidden md:flex"
             >
-              <Bell className="w-4 h-4 mr-2" />
+              <Bell className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               Test Alert
             </Button>
             
             <Button
               onClick={runMonitoringCycle}
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm flex-1 sm:flex-initial"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing...
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                  <span className="hidden sm:inline">Analyzing...</span>
+                  <span className="sm:hidden">...</span>
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 mr-2" />
-                  Run Monitoring Cycle
+                  <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Run Monitoring Cycle</span>
+                  <span className="sm:hidden">Run</span>
                 </>
               )}
             </Button>
@@ -344,10 +351,10 @@ const ForestMonitoringDashboard = () => {
       
       {/* Statistics Cards */}
       {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Card className="border-l-4 border-l-gray-500">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">
+            <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-4">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-600 truncate">
                 Total Alerts
               </CardTitle>
             </CardHeader>
@@ -414,7 +421,7 @@ const ForestMonitoringDashboard = () => {
       
       {/* Interactive Map View */}
       {showMap && (
-        <Card className="mb-8">
+        <Card className="mb-8" ref={mapRef}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapIcon className="w-5 h-5 text-green-600" />
@@ -809,7 +816,10 @@ const ForestMonitoringDashboard = () => {
                     onClick={() => {
                       setShowMap(true);
                       handleAlertMarkerClick(alert);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      // Scroll to map after a short delay to ensure it renders
+                      setTimeout(() => {
+                        mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 100);
                     }}
                     className="bg-green-600 hover:bg-green-700"
                   >

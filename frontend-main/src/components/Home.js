@@ -169,29 +169,29 @@ const Home = () => {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-50">
       {/* Header */}
       <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent truncate">
                   {t('websiteName')}
                 </h1>
-                <p className="text-sm text-gray-600 font-medium">{t('websiteTagline')}</p>
+                <p className="text-xs sm:text-sm text-gray-600 font-medium hidden sm:block">{t('websiteTagline')}</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <LanguageSelector />
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="hidden md:flex items-center gap-2 text-sm text-gray-600">
                 <User className="w-4 h-4" />
                 <span>{user?.username}</span>
               </div>
               <button
                 onClick={logout}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
-                <LogOut className="w-4 h-4" />
-                {t('logout')}
+                <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">{t('logout')}</span>
               </button>
             </div>
           </div>
@@ -202,44 +202,44 @@ const Home = () => {
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/40"></div>
         <div 
-          className="relative min-h-[70vh] flex items-center justify-center bg-cover bg-center"
+          className="relative min-h-[60vh] sm:min-h-[70vh] flex items-center justify-center bg-cover bg-center"
           style={{
             backgroundImage: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.3)), url('https://wallpapercave.com/wp/3ruMITV.jpg')`
           }}
         >
-          <div className="text-center text-white px-6 max-w-5xl mx-auto">
-            <div className="mb-8">
-              <div className="inline-block px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20 mb-6">
-                <span className="text-green-200 font-semibold text-lg">{t('forestRightsRevolution')}</span>
+          <div className="text-center text-white px-4 sm:px-6 max-w-5xl mx-auto">
+            <div className="mb-6 sm:mb-8">
+              <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20 mb-4 sm:mb-6">
+                <span className="text-green-200 font-semibold text-sm sm:text-base lg:text-lg">{t('forestRightsRevolution')}</span>
               </div>
             </div>
-            <h1 className="text-6xl md:text-8xl font-extrabold mb-8 leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-extrabold mb-6 sm:mb-8 leading-tight px-4">
               <span className="bg-gradient-to-r from-green-300 via-blue-300 to-teal-300 bg-clip-text text-transparent drop-shadow-2xl">
                 {t('websiteName')}
               </span>
             </h1>
-            <h2 className="text-2xl md:text-4xl font-bold mb-6 text-yellow-200 drop-shadow-lg">
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-4xl font-bold mb-4 sm:mb-6 text-yellow-200 drop-shadow-lg px-4">
               {t('websiteFullTitle')}
             </h2>
-            <p className="text-xl md:text-2xl mb-10 text-gray-100 leading-relaxed drop-shadow-md max-w-4xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-8 sm:mb-10 text-gray-100 leading-relaxed drop-shadow-md max-w-4xl mx-auto px-4">
               {t('fraPortalSubtitle')}
             </p>
-            <div className="flex flex-col sm:flex-row gap-6 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center px-4">
               <button
                 onClick={() => navigate('/login')}
-                className="group px-10 py-5 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-2xl hover:shadow-green-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-green-400/50"
+                className="group px-6 sm:px-8 md:px-10 py-4 sm:py-5 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-xl sm:rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-2 sm:gap-3 transition-all duration-300 shadow-2xl hover:shadow-green-500/25 transform hover:scale-105 hover:-translate-y-1 sm:hover:-translate-y-2 border-2 border-green-400/50"
               >
                 <span>🔐</span>
-                Admin Login
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <span className="whitespace-nowrap">Admin Login</span>
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
                 onClick={() => navigate('/login')}
-                className="group px-10 py-5 bg-gradient-to-r from-teal-600 to-cyan-700 hover:from-teal-700 hover:to-cyan-800 text-white rounded-2xl font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-teal-500/25 transform hover:scale-105 hover:-translate-y-2 border-2 border-teal-400/50 backdrop-blur-sm flex items-center justify-center gap-3"
+                className="group px-6 sm:px-8 md:px-10 py-4 sm:py-5 bg-gradient-to-r from-teal-600 to-cyan-700 hover:from-teal-700 hover:to-cyan-800 text-white rounded-xl sm:rounded-2xl font-bold text-base sm:text-lg transition-all duration-300 shadow-2xl hover:shadow-teal-500/25 transform hover:scale-105 hover:-translate-y-1 sm:hover:-translate-y-2 border-2 border-teal-400/50 backdrop-blur-sm flex items-center justify-center gap-2 sm:gap-3"
               >
                 <span>👤</span>
-                User Login
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <span className="whitespace-nowrap">User Login</span>
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </div>
