@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from '../contexts/LanguageContext';
-import { ChevronDown, Globe, Loader2 } from 'lucide-react';
+import { ChevronDown, Globe, Loader2, Home, Building2, Leaf, MapPin } from 'lucide-react';
 
 const LanguageSelector = () => {
   const { 
@@ -17,12 +17,12 @@ const LanguageSelector = () => {
 
   // Group languages by region - Enhanced categorization
   const regions = {
-    all: '🌍 All Languages',
-    indian: '🇮🇳 Indian Languages',
-    official: '🏛️ 22 Official Languages',
-    tribal: '🌿 Tribal Languages',
+    all: 'All Languages',
+    indian: 'Indian Languages',
+    official: '22 Official Languages',
+    tribal: 'Tribal Languages',
     National: 'National',
-    International: '🌐 International Languages'
+    International: 'International Languages'
   };
 
   const getFilteredLanguages = () => {
@@ -66,11 +66,17 @@ const LanguageSelector = () => {
   };
 
   const getLanguageIcon = (language) => {
-    // Get icon based on region and language
-    if (language.region === 'International') return '�';
-    if (language.fallback) return '�'; // Tribal languages
-    if (language.region === 'National') return language.code === 'en' ? '🇬�' : '🇮�';
-    return '🏛️'; // Regional/Official Indian languages
+    // Get icon component based on region and language
+    if (language.region === 'International') {
+      return <Globe className="h-5 w-5 text-blue-600" />;
+    }
+    if (language.fallback) {
+      return <Leaf className="h-5 w-5 text-green-600" />; // Tribal languages
+    }
+    if (language.region === 'National') {
+      return <Home className="h-5 w-5 text-orange-600" />;
+    }
+    return <Building2 className="h-5 w-5 text-indigo-600" />; // Regional/Official Indian languages
   };
 
   return (
@@ -123,7 +129,7 @@ const LanguageSelector = () => {
                   {showIndianHeader && (
                     <div className="px-4 py-2 bg-gradient-to-r from-green-50 to-blue-50 border-b border-green-100">
                       <div className="flex items-center gap-2 text-xs font-bold text-green-700">
-                        <span>🇮🇳</span>
+                        <Home className="h-4 w-4" />
                         <span>INDIAN LANGUAGES</span>
                         <span className="text-green-600">({array.filter(l => l.region !== 'International').length})</span>
                       </div>
@@ -132,7 +138,7 @@ const LanguageSelector = () => {
                   {showInternationalHeader && (
                     <div className="px-4 py-2 bg-gradient-to-r from-gray-50 to-slate-50 border-y border-gray-200 mt-2">
                       <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-                        <span>🌐</span>
+                        <Globe className="h-4 w-4" />
                         <span>INTERNATIONAL LANGUAGES</span>
                         <span className="text-gray-500">({array.filter(l => l.region === 'International').length})</span>
                       </div>
@@ -146,9 +152,9 @@ const LanguageSelector = () => {
                       currentLanguage === language.code ? 'bg-blue-50 border-r-4 border-blue-500' : ''
                     }`}
                   >
-                    <span className="text-lg">
+                    <div className="flex-shrink-0">
                       {getLanguageIcon(language)}
-                    </span>
+                    </div>
                     <div className="flex-1">
                       <div className="font-medium text-sm text-gray-900">
                         {language.nativeName}
@@ -161,7 +167,7 @@ const LanguageSelector = () => {
                       </div>
                       {language.fallback && (
                         <div className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
-                          <span>⚡</span>
+                          <Leaf className="h-3 w-3" />
                           <span>Translated via Google Translate</span>
                         </div>
                       )}
@@ -180,12 +186,21 @@ const LanguageSelector = () => {
 
           {/* Footer */}
           <div className="p-3 border-t border-gray-100 bg-gradient-to-r from-green-50 to-blue-50">
-            <div className="text-xs text-gray-700 mb-2 flex items-center gap-2">
-              <span>🌿 Tribal</span>
+            <div className="text-xs text-gray-700 mb-2 flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <Leaf className="h-3 w-3 text-green-600" />
+                <span>Tribal</span>
+              </div>
               <span>•</span>
-              <span>🏛️ Official</span>
+              <div className="flex items-center gap-1">
+                <Building2 className="h-3 w-3 text-indigo-600" />
+                <span>Official</span>
+              </div>
               <span>•</span>
-              <span>� International</span>
+              <div className="flex items-center gap-1">
+                <Globe className="h-3 w-3 text-blue-600" />
+                <span>International</span>
+              </div>
             </div>
             <div className="text-xs text-green-700 font-medium flex items-center gap-1">
               <Globe className="h-3 w-3" />
