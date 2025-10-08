@@ -49,6 +49,27 @@
   box-sizing: border-box;
 }
 
+/* Ensure body and html are scrollable on mobile */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Prevent text from overflowing on mobile */
+* {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   line-height: 1.6;

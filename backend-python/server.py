@@ -237,6 +237,24 @@ class DSRecommendation(BaseModel):
     forest_dependency: Optional[float] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class SatelliteAnalysisRequest(BaseModel):
+    latitude: float
+    longitude: float
+    radius_km: Optional[float] = 5.0
+    analysis_type: Optional[str] = "vegetation"  # "vegetation", "deforestation", "change_detection"
+
+class SatelliteAnalysisResult(BaseModel):
+    latitude: float
+    longitude: float
+    analysis_type: str
+    ndvi_score: Optional[float] = None
+    forest_cover_percent: Optional[float] = None
+    deforestation_detected: Optional[bool] = False
+    vegetation_health: Optional[str] = None  # "healthy", "moderate", "poor"
+    land_use_classification: Optional[Dict[str, float]] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    confidence_score: float = 0.85
+
 # Create FastAPI app and router
 app = FastAPI(title="FRA Atlas API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
@@ -660,6 +678,147 @@ async def add_satellite_asset(village_id: str, asset: SatelliteAsset):
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Asset creation failed: {str(e)}")
+
+# Satellite Analysis Endpoint
+@api_router.post("/satellite/analyze")
+async def analyze_satellite_location(request: SatelliteAnalysisRequest):
+    """Analyze satellite data for a specific location"""
+    try:
+        # Simulate satellite analysis with realistic data
+        # In production, this would call actual satellite imagery APIs (Sentinel, Landsat, etc.)
+        
+        # Generate NDVI score (Normalized Difference Vegetation Index)
+        # Values range from -1 to 1, where higher values indicate healthier vegetation
+        import random
+        random.seed(int(request.latitude * 1000 + request.longitude * 1000))
+        
+        ndvi_score = round(random.uniform(0.3, 0.85), 3)
+        
+        # Determine vegetation health based on NDVI
+        if ndvi_score > 0.6:
+            vegetation_health = "healthy"
+        elif ndvi_score > 0.4:
+            vegetation_health = "moderate"
+        else:
+            vegetation_health = "poor"
+        
+        # Calculate forest cover percentage
+        forest_cover = round(random.uniform(35, 85), 2)
+        
+        # Land use classification
+        remaining = 100 - forest_cover
+        agricultural = round(remaining * random.uniform(0.3, 0.6), 2)
+        water = round(remaining * random.uniform(0.05, 0.15), 2)
+        barren = round(remaining - agricultural - water, 2)
+        
+        land_use = {
+            "forest": forest_cover,
+            "agricultural": agricultural,
+            "water_bodies": water,
+            "barren_land": barren
+        }
+        
+        # Deforestation detection (based on NDVI and forest cover)
+        deforestation_detected = ndvi_score < 0.5 or forest_cover < 50
+        
+        result = SatelliteAnalysisResult(
+            latitude=request.latitude,
+            longitude=request.longitude,
+            analysis_type=request.analysis_type,
+            ndvi_score=ndvi_score,
+            forest_cover_percent=forest_cover,
+            deforestation_detected=deforestation_detected,
+            vegetation_health=vegetation_health,
+            land_use_classification=land_use,
+            confidence_score=0.85
+        )
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Satellite analysis failed: {str(e)}")
+
+@api_router.get("/satellite/reports")
+async def get_satellite_reports(
+    village_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Get historical satellite analysis reports"""
+    try:
+        # In production, this would query a database of stored analyses
+        reports = []
+        
+        # Return sample report structure
+        sample_report = {
+            "id": str(uuid.uuid4()),
+            "village_id": village_id or "sample_village",
+            "analysis_date": datetime.now(timezone.utc).isoformat(),
+            "summary": {
+                "average_ndvi": 0.68,
+                "forest_cover_trend": "stable",
+                "alerts": []
+            }
+        }
+        
+        reports.append(sample_report)
+        return {"reports": reports, "total": len(reports)}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch reports: {str(e)}")
+
+@api_router.post("/satellite/alerts")
+async def create_satellite_alert(
+    village_id: str,
+    alert_type: str = "deforestation",
+    threshold: float = 0.5
+):
+    """Set up automated alerts for satellite analysis"""
+    try:
+        alert = {
+            "id": str(uuid.uuid4()),
+            "village_id": village_id,
+            "alert_type": alert_type,
+            "threshold": threshold,
+            "status": "active",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        return alert
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create alert: {str(e)}")
+
+@api_router.get("/monitoring/deforestation")
+async def check_deforestation(
+    latitude: float = Query(...),
+    longitude: float = Query(...),
+    time_period_days: int = 30
+):
+    """Check for deforestation in a specific area over time"""
+    try:
+        import random
+        random.seed(int(latitude * 1000 + longitude * 1000))
+        
+        # Simulate change detection
+        change_detected = random.choice([True, False, False])  # 33% chance
+        severity = random.choice(["low", "medium", "high"]) if change_detected else None
+        
+        result = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "time_period_days": time_period_days,
+            "change_detected": change_detected,
+            "severity": severity,
+            "estimated_area_affected_hectares": round(random.uniform(5, 50), 2) if change_detected else 0,
+            "analysis_date": datetime.now(timezone.utc).isoformat(),
+            "recommendation": "Immediate field verification required" if change_detected else "No action needed"
+        }
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Deforestation check failed: {str(e)}")
 
 # CSS Scheme Integration
 @api_router.get("/schemes/{village_id}")

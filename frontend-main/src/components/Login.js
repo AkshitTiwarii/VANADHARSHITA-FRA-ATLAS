@@ -27,6 +27,7 @@ const Login = () => {
     
     if (result.success) {
       toast.success('Login successful');
+      // All users go to dashboard, sidebar shows appropriate options based on role
       window.location.href = '/dashboard';
     } else {
       toast.error(result.message || 'Login failed');
@@ -125,11 +126,19 @@ const Login = () => {
             <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="flex items-start space-x-2">
                 <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-                <div>
-                  <h4 className="text-sm font-medium text-amber-800">Demo Credentials</h4>
-                  <div className="mt-2 text-sm text-amber-700">
-                    <p><strong>Username:</strong> admin</p>
-                    <p><strong>Password:</strong> admin123</p>
+                <div className="w-full">
+                  <h4 className="text-sm font-medium text-amber-800 mb-2">Demo Credentials</h4>
+                  <div className="space-y-3 text-sm text-amber-700">
+                    <div className="bg-white/50 p-2 rounded">
+                      <p className="font-semibold">Admin Login:</p>
+                      <p><strong>Username:</strong> admin</p>
+                      <p><strong>Password:</strong> admin123</p>
+                    </div>
+                    <div className="bg-white/50 p-2 rounded">
+                      <p className="font-semibold">User/Citizen Login:</p>
+                      <p><strong>Username:</strong> viewer</p>
+                      <p><strong>Password:</strong> viewer123</p>
+                    </div>
                   </div>
                 </div>
               </div>

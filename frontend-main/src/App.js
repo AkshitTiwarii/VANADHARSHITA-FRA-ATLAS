@@ -22,6 +22,8 @@ import PublicTransparencyPortal from './components/PublicTransparencyPortal';
 import CitizenPortal from './components/CitizenPortal';
 import SimpleMapTest from './components/SimpleMapTest';
 import ForestAtlasFixed from './components/ForestAtlasFixed';
+import ForestAtlasGoogleMaps from './components/ForestAtlasGoogleMaps';
+import ForestMonitoringDashboard from './components/ForestMonitoringDashboard';
 
 // Auth Context
 const AuthContext = React.createContext();
@@ -98,7 +100,8 @@ const ProtectedRoute = ({ children }) => {
 
 // Main Layout Component
 const MainLayout = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Set sidebar closed on mobile by default, open on desktop
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const { user } = useAuth();
 
   return (
@@ -109,12 +112,26 @@ const MainLayout = ({ children }) => {
         setSidebarOpen={setSidebarOpen} 
       />
       <div className="flex pt-[120px]">
+        {/* Mobile Overlay */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        
         <Sidebar 
           isOpen={sidebarOpen} 
-          userRole={user?.role} 
+          userRole={user?.role}
+          onNavigate={() => {
+            // Close sidebar on mobile after navigation
+            if (window.innerWidth < 1024) {
+              setSidebarOpen(false);
+            }
+          }}
         />
-        <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'} min-h-[calc(100vh-120px)]`}>
-          <div className="p-6 h-full">
+        <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'} min-h-[calc(100vh-120px)] w-full`}>
+          <div className="p-4 sm:p-6 h-full">
             {children}
           </div>
         </main>
@@ -133,6 +150,8 @@ function App() {
               {/* Public Routes - No login required */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/atlas" element={<ForestAtlasGoogleMaps />} />
+              <Route path="/citizen-portal" element={<CitizenPortal />} />
               
               {/* Protected Routes - Login required */}
               <Route path="/dashboard" element={
@@ -142,7 +161,12 @@ function App() {
                   </MainLayout>
                 </ProtectedRoute>
               } />
-              <Route path="/atlas" element={
+              <Route path="/monitoring" element={
+                <ProtectedRoute>
+                  <ForestMonitoringDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/atlas-old" element={
                 <ProtectedRoute>
                   <MainLayout>
                     <ForestAtlasFixed />
@@ -199,11 +223,9 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="/transparency" element={
-                <MainLayout>
-                  <PublicTransparencyPortal />
-                </MainLayout>
+                <PublicTransparencyPortal />
               } />
-              <Route path="/citizen-portal" element={
+              <Route path="/citizen-portal-old" element={
                 <MainLayout>
                   <CitizenPortal />
                 </MainLayout>

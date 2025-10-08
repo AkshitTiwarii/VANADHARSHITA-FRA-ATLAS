@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📡 Real-time Officer Monitoring Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status.connected .status-indicator {
+            background: #28a745;
+        }
+
+        .status.disconnected .status-indicator {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .events-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 25px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .events-container h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .event {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .event.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+
+        .event.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .event.warning {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .event.info {
+            border-left-color: #17a2b8;
+            background: #d1ecf1;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .event-type {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .event-time {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .workflow-id {
+            font-family: 'Courier New', monospace;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .event-message {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .event-details {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .event-details div {
+            margin-bottom: 4px;
+        }
+
+        .no-events {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        .controls {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        /* Scrollbar styling */
+        .events-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .events-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .events-container::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        .events-container::-webkit-scrollbar-thumb:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span>📡</span>
+                Real-time Officer Monitoring Dashboard
+            </h1>
+            <div id="status" class="status disconnected">
+                <div class="status-indicator"></div>
+                <span>Disconnected</span>
+            </div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-card">
+                <h3>Total Events</h3>
+                <div class="value" id="totalEvents">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Active Workflows</h3>
+                <div class="value" id="activeWorkflows">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Approvals</h3>
+                <div class="value" id="approvals">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Manual Reviews</h3>
+                <div class="value" id="manualReviews">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" onclick="reconnect()">🔄 Reconnect</button>
+            <button class="btn-danger" onclick="clearEvents()">🗑️ Clear Events</button>
+            <button class="btn-info" onclick="fetchHistory()">📜 Fetch History</button>
+            <button class="btn-success" onclick="toggleSound()">
+                <span id="soundIcon">🔊</span> Sound
+            </button>
+        </div>
+
+        <div class="events-container">
+            <h2>Live Events Feed</h2>
+            <div id="eventsList">
+                <div class="no-events">
+                    Waiting for events... 🕐
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let events = [];
+        let workflows = new Set();
+        let approvalCount = 0;
+        let manualReviewCount = 0;
+        let soundEnabled = true;
+
+        // Audio notifications
+        const successSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSWAzPPaizsIHGS57OmtZhsGN5DW8sZ1Jwc3wPLOgTAEKXfJ8N2LPAkcYrno6qJUEw1Nqefxu2sgBSaAy/PYizYIHWG56+qjVRMNTarp8sR2KgY2vfDLfDAEK3jH8d6KOwkbY7rp7KRTEw1Mq+fxvGohBSmBy/PYizUIHGG56OqiVRINS6vo8cdxKQY4wPHMgDAEKnfH8N+KPAkbYrro66JVEw5Mqejyu2ghBSaAy/PZizcIHGK66OqiUxINTKrn8sF0KgY1vfHMgC8EK3fI8d2KOwkcYrrp66JVEg5Lqunyw28jBSh/y/PZizcIHWK65+yjUxINSqvn8r9yKQY3v/HLgC8EKnjJ8d2KOwgcYrro66NVEw1Lqujyv28gBCZ/y/PZizcIHWK65+qiVBMOS6vo8sB0KQY2vvHMfy8EKnfI8d+LPQkcYrrp6qNUEw5Lqejyv28gBCZ/y/PZizcIHWK65+qiVBMOS6vo8sB0KQY2vvHMfy8EKnfI8d+LPQkcYrrp6qNUEw5Lqejyv28gBCZ/y/PZizcIHWK65+qiVBMOS6vo8sB0KQY2vvHMfy8EKnfI8d+LPQkcYrrp6qNUEw5Lqejyv28gBCZ/y/PZizcIHWK65+qiVBMOS6vo8sB0KQY2vvHMfy8EKnfI8d+LPQkcYrrp6qNUEw5Lqejyv28gBCZ/y/PZizcIHWK65+qiVBMOS6vo8sB0KQY2vvHMfy8EKnfI8d+LPQk=');
+        const errorSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSWAzPPaizsIHGS57OmtZhsGN5DW8sZ1Jwc3wPLOgTAEKXfJ8N2LPAkcYrno6qJUEw1Nqefxu2sgBSaAy/PYizYIHWG56+qjVRMNTarp8sR2KgY2vfDLfDAEK3jH8d6KOwkbY7rp7KRTEw1Mq+fxvGohBSmBy/PYizUIHGG56OqiVRINS6vo8cdxKQY4wPHMgDAEKnfH8N+KPAkbYrro66JVEw5Mqejyu2ghBSaAy/PZizcIHGK66OqiUxINTKrn8sF0KgY1vfHMgC8EK3fI8d2KOwkcYrrp66JVEg5Lqunyw28jBSh/y/PZizcIHWK65+yjUxINSqvn8r9yKQY3v/HLgC8EKnjJ8d2KOwgcYrro66NVEw1Lqujyv28gBCZ/y/PZizcIHWK65+qiVBMOS6vo8sB0KQY2vvHMfy8EKnfI8d+LPQkcYrrp6qNUEw5Lqejyv28gBCZ/y/PZizcIHWK65+qiVBMOS6vo8sB0KQY2vvHMfy8EKnfI8d+LPQk=');
+
+        function connect() {
+            eventSource = new EventSource('http://localhost:8000/api/officer/realtime-events');
+
+            eventSource.onopen = () => {
+                updateStatus(true);
+                console.log('✅ Connected to real-time events');
+            };
+
+            eventSource.onmessage = (event) => {
+                const eventData = JSON.parse(event.data);
+                addEvent(eventData);
+                updateStats(eventData);
+                playSound(eventData.event_type);
+            };
+
+            eventSource.onerror = (error) => {
+                updateStatus(false);
+                console.error('❌ Connection error:', error);
+            };
+        }
+
+        function updateStatus(connected) {
+            const statusEl = document.getElementById('status');
+            if (connected) {
+                statusEl.className = 'status connected';
+                statusEl.innerHTML = '<div class="status-indicator"></div><span>Connected</span>';
+            } else {
+                statusEl.className = 'status disconnected';
+                statusEl.innerHTML = '<div class="status-indicator"></div><span>Disconnected</span>';
+            }
+        }
+
+        function addEvent(eventData) {
+            events.unshift(eventData);
+            
+            // Determine event class
+            let eventClass = 'info';
+            if (eventData.event_type.includes('verified') || eventData.event_type.includes('approved')) {
+                eventClass = 'success';
+            } else if (eventData.event_type.includes('failed') || eventData.event_type.includes('contradiction')) {
+                eventClass = 'error';
+            } else if (eventData.event_type.includes('review')) {
+                eventClass = 'warning';
+            }
+
+            // Format timestamp
+            const time = new Date(eventData.timestamp).toLocaleTimeString();
+
+            // Build event HTML
+            let detailsHTML = '';
+            if (Object.keys(eventData.data).length > 1) {
+                detailsHTML = '<div class="event-details">';
+                for (const [key, value] of Object.entries(eventData.data)) {
+                    if (key !== 'message' && typeof value !== 'object') {
+                        detailsHTML += `<div><strong>${key}:</strong> ${value}</div>`;
+                    }
+                }
+                detailsHTML += '</div>';
+            }
+
+            const eventHTML = `
+                <div class="event ${eventClass}">
+                    <div class="event-header">
+                        <div class="event-type">${eventData.event_type}</div>
+                        <div class="event-time">${time}</div>
+                    </div>
+                    <div class="workflow-id">Workflow: ${eventData.workflow_id}</div>
+                    <div class="event-message">${eventData.data.message || 'No message'}</div>
+                    ${detailsHTML}
+                </div>
+            `;
+
+            const eventsList = document.getElementById('eventsList');
+            
+            // Remove "no events" message
+            if (eventsList.querySelector('.no-events')) {
+                eventsList.innerHTML = '';
+            }
+
+            eventsList.insertAdjacentHTML('afterbegin', eventHTML);
+
+            // Keep only last 50 events in DOM
+            while (eventsList.children.length > 50) {
+                eventsList.removeChild(eventsList.lastChild);
+            }
+        }
+
+        function updateStats(eventData) {
+            workflows.add(eventData.workflow_id);
+            
+            if (eventData.event_type === 'workflow_approved') {
+                approvalCount++;
+            } else if (eventData.event_type === 'workflow_manual_review') {
+                manualReviewCount++;
+            }
+
+            document.getElementById('totalEvents').textContent = events.length;
+            document.getElementById('activeWorkflows').textContent = workflows.size;
+            document.getElementById('approvals').textContent = approvalCount;
+            document.getElementById('manualReviews').textContent = manualReviewCount;
+        }
+
+        function playSound(eventType) {
+            if (!soundEnabled) return;
+
+            if (eventType.includes('approved') || eventType.includes('verified')) {
+                successSound.play().catch(() => {});
+            } else if (eventType.includes('failed') || eventType.includes('contradiction')) {
+                errorSound.play().catch(() => {});
+            }
+        }
+
+        function reconnect() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            connect();
+        }
+
+        function clearEvents() {
+            events = [];
+            workflows.clear();
+            approvalCount = 0;
+            manualReviewCount = 0;
+            
+            document.getElementById('eventsList').innerHTML = '<div class="no-events">Events cleared. Waiting for new events... 🕐</div>';
+            document.getElementById('totalEvents').textContent = '0';
+            document.getElementById('activeWorkflows').textContent = '0';
+            document.getElementById('approvals').textContent = '0';
+            document.getElementById('manualReviews').textContent = '0';
+        }
+
+        function fetchHistory() {
+            fetch('http://localhost:8000/api/officer/recent-events')
+                .then(res => res.json())
+                .then(data => {
+                    alert(`Found ${data.count} events in history. Loading...`);
+                    data.events.forEach(event => {
+                        addEvent(event);
+                        updateStats(event);
+                    });
+                })
+                .catch(err => alert('Error fetching history: ' + err.message));
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+        }
+
+        // Auto-connect on page load
+        window.addEventListener('load', connect);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../contexts/LanguageContext';
 import { 
   FileText, 
@@ -14,25 +15,44 @@ import {
   Volume2,
   Languages,
   HelpCircle,
-  Phone
+  Phone,
+  ArrowLeft,
+  Home,
+  X,
+  Loader2,
+  Scan
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import axios from 'axios';
+import { toast } from 'sonner';
 
 const CitizenPortal = () => {
+  const navigate = useNavigate();
   const { t, currentLanguage } = useTranslation();
   const [activeTab, setActiveTab] = useState('file-claim');
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [claims, setClaims] = useState([]);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [processingOCR, setProcessingOCR] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [newClaim, setNewClaim] = useState({
     claimType: '',
     landArea: '',
     locationDescription: '',
     beneficiaryName: '',
     fatherName: '',
-    documents: []
+    documents: [],
+    latitude: '',
+    longitude: ''
   });
+  
+  const [submittingClaim, setSubmittingClaim] = useState(false);
+  const [workflowResult, setWorkflowResult] = useState(null);
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
 
   // Mock user claims data with realistic FRA scenarios
   const mockClaims = [
@@ -76,10 +96,10 @@ const CitizenPortal = () => {
   ];
 
   const claimTypes = [
-    { value: 'ifr', label: t('individualForestRights'), description: t('ifrDescription') },
-    { value: 'cfr', label: t('communityForestRights'), description: t('cfrDescription') },
-    { value: 'habitat', label: t('habitatRights'), description: t('habitatDescription') },
-    { value: 'development', label: t('developmentRights'), description: t('developmentDescription') }
+    { value: 'ifr', label: t('individualForestRights'), description: t('individualForestRightsDesc') },
+    { value: 'cfr', label: t('communityForestRights'), description: t('communityForestRightsDesc') },
+    { value: 'habitat', label: t('habitatRights'), description: t('habitatRightsDesc') },
+    { value: 'development', label: t('developmentRights'), description: t('developmentRightsDesc') }
   ];
 
   const getStatusIcon = (status) => {
@@ -99,6 +119,16 @@ const CitizenPortal = () => {
       case 'pending': return 'bg-blue-100 text-blue-800';
       case 'disputed': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'approved': return t('approvedStatus');
+      case 'under_review': return t('underReviewStatus');
+      case 'pending': return t('pendingStatus');
+      case 'disputed': return t('disputed');
+      default: return status;
     }
   };
 
@@ -124,21 +154,344 @@ const CitizenPortal = () => {
     }
   };
 
+  // Camera and OCR Functions
+  const startCamera = async () => {
+    try {
+      // Check if camera is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error('Camera not supported', {
+          description: 'Your browser does not support camera access. Please use Chrome, Firefox, or Safari.'
+        });
+        return;
+      }
+
+      // Request camera permission with fallback options
+      let constraints = { 
+        video: { 
+          facingMode: 'environment', // Prefer back camera
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        } 
+      };
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        setCameraStream(stream);
+        setShowCamera(true);
+        
+        // Wait for modal to render, then attach stream
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(err => {
+              console.error('Video play error:', err);
+            });
+          }
+        }, 100);
+        
+        toast.success('Camera ready! Position your document.');
+      } catch (err) {
+        // Fallback: try with any camera (front or back)
+        console.warn('Back camera not available, trying any camera...', err);
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setCameraStream(fallbackStream);
+        setShowCamera(true);
+        
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = fallbackStream;
+            videoRef.current.play().catch(e => console.error('Video play error:', e));
+          }
+        }, 100);
+        
+        toast.success('Camera ready! (Using available camera)');
+      }
+    } catch (error) {
+      console.error('Camera access denied:', error);
+      
+      let errorMessage = 'Unable to access camera.';
+      let errorDescription = 'Please check permissions.';
+      
+      if (error.name === 'NotAllowedError') {
+        errorDescription = 'Camera permission denied. Please allow camera access in browser settings.';
+      } else if (error.name === 'NotFoundError') {
+        errorDescription = 'No camera found on this device.';
+      } else if (error.name === 'NotReadableError') {
+        errorDescription = 'Camera is already in use by another application.';
+      } else if (error.name === 'SecurityError') {
+        errorDescription = 'Camera access blocked. Make sure you are using HTTPS or localhost.';
+      }
+      
+      toast.error(errorMessage, { description: errorDescription });
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const captureImage = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    
+    // Convert to blob
+    canvas.toBlob(async (blob) => {
+      if (blob) {
+        await processOCR(blob);
+      }
+    }, 'image/jpeg', 0.95);
+  };
+
+  const processOCR = async (imageBlob) => {
+    setProcessingOCR(true);
+    stopCamera();
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', imageBlob, 'document.jpg');
+
+      // Call AI service OCR endpoint
+      const response = await axios.post('http://localhost:8000/api/ocr/extract', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data && response.data.extracted_data) {
+        const data = response.data.extracted_data;
+        
+        // Auto-fill form fields from OCR data
+        setNewClaim(prev => ({
+          ...prev,
+          beneficiaryName: data.name || prev.beneficiaryName,
+          fatherName: data.father_name || prev.fatherName,
+          landArea: data.land_area || prev.landArea,
+          locationDescription: data.location || prev.locationDescription,
+          documents: [...prev.documents, imageBlob] // Store the document for later submission
+        }));
+
+        toast.success('Document scanned successfully! Form fields auto-filled.', {
+          description: 'Please review and correct any information if needed.'
+        });
+      }
+    } catch (error) {
+      console.error('OCR processing error:', error);
+      toast.error('Failed to process document', {
+        description: 'Please try again or enter details manually.'
+      });
+    } finally {
+      setProcessingOCR(false);
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await processOCR(file);
+    }
+  };
+  
+  // NEW: Handle comprehensive document verification workflow
+  const handleSubmitClaim = async () => {
+    // Validation
+    if (!newClaim.beneficiaryName || !newClaim.locationDescription) {
+      toast.error('Please fill in required fields', {
+        description: 'Name and location are required'
+      });
+      return;
+    }
+    
+    if (newClaim.documents.length === 0) {
+      toast.error('Please upload a document', {
+        description: 'Upload a patta or forest rights document to proceed'
+      });
+      return;
+    }
+    
+    // Get geolocation or use manual coordinates
+    let latitude = newClaim.latitude;
+    let longitude = newClaim.longitude;
+    
+    // Try to get current location if not provided
+    if (!latitude || !longitude) {
+      toast.info('Detecting your location...', {
+        description: 'This helps verify your forest rights claim'
+      });
+      
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000
+          });
+        });
+        
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+        
+        toast.success('Location detected', {
+          description: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`
+        });
+      } catch (geoError) {
+        toast.warning('Could not detect location', {
+          description: 'Using default coordinates. You can update later.'
+        });
+        // Use default coordinates for testing (Gadchiroli, Maharashtra)
+        latitude = 18.9217;
+        longitude = 77.0038;
+      }
+    }
+    
+    setSubmittingClaim(true);
+    
+    try {
+      const formData = new FormData();
+      
+      // Use the first uploaded document
+      const documentFile = newClaim.documents[0];
+      formData.append('file', documentFile, documentFile.name || 'document.jpg');
+      formData.append('applicant_name', newClaim.beneficiaryName);
+      formData.append('applicant_location', newClaim.locationDescription);
+      formData.append('latitude', latitude);
+      formData.append('longitude', longitude);
+      formData.append('language', currentLanguage || 'auto');
+      
+      toast.info('🔄 Starting comprehensive verification...', {
+        description: 'This may take 10-15 seconds'
+      });
+      
+      // Call the comprehensive verification workflow
+      const response = await axios.post(
+        'http://localhost:8000/api/document/comprehensive-verification',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 30000 // 30 second timeout
+        }
+      );
+      
+      console.log('Workflow response:', response.data);
+      
+      if (response.data.success) {
+        setWorkflowResult(response.data);
+        setShowWorkflowModal(true);
+        
+        // Show appropriate toast based on workflow status
+        if (response.data.status === 'approved') {
+          toast.success('🎉 Application Approved!', {
+            description: `DSS Score: ${response.data.dss_recommendation?.score || 'N/A'} - ${response.data.dss_recommendation?.recommendation || ''}`
+          });
+        } else if (response.data.status === 'manual_review_required' || response.data.status === 'manual_review') {
+          toast.warning('⚠️ Manual Review Required', {
+            description: 'Your application has been sent to an officer for review'
+          });
+        } else if (response.data.status === 'blockchain_failed') {
+          toast.error('❌ Verification Failed', {
+            description: 'Document verification failed. Officer has been notified.'
+          });
+        } else {
+          toast.info('📋 Application Submitted', {
+            description: `Status: ${response.data.status}`
+          });
+        }
+        
+        // Reset form
+        setNewClaim({
+          claimType: '',
+          landArea: '',
+          locationDescription: '',
+          beneficiaryName: '',
+          fatherName: '',
+          documents: [],
+          latitude: '',
+          longitude: ''
+        });
+        
+      } else {
+        throw new Error(response.data.message || 'Verification failed');
+      }
+      
+    } catch (error) {
+      console.error('Claim submission error:', error);
+      
+      let errorMessage = 'Failed to submit claim';
+      let errorDescription = 'Please try again or contact support';
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'Request timeout';
+        errorDescription = 'The verification is taking longer than expected. Please check status later.';
+      } else if (error.response) {
+        errorMessage = 'Verification error';
+        errorDescription = error.response.data?.detail || error.response.data?.message || 'Server error occurred';
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = 'Network error';
+        errorDescription = 'Please check if AI service is running on port 8000';
+      }
+      
+      toast.error(errorMessage, { description: errorDescription });
+    } finally {
+      setSubmittingClaim(false);
+    }
+  };
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  // Connect video stream when camera modal opens
+  useEffect(() => {
+    if (showCamera && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(err => {
+        console.error('Error playing video:', err);
+      });
+    }
+  }, [showCamera, cameraStream]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header with Back Button */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{t('citizenPortal')}</h1>
-              <p className="text-sm text-gray-600">{t('citizenPortalSubtitle')}</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span className="font-medium">{t('backToHome')}</span>
+              </button>
+              <div className="h-8 w-px bg-gray-300"></div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{t('citizenPortal')}</h1>
+                <p className="text-sm text-gray-600">{t('citizenPortalDesc')}</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => speakText(t('welcomeToCitizenPortal'))}
+                onClick={() => speakText(t('citizenPortalDesc'))}
                 className="flex items-center gap-2"
               >
                 <Volume2 className="w-4 h-4" />
@@ -257,7 +610,7 @@ const CitizenPortal = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('landArea')} ({t('hectares')})
+                      {t('landAreaHectares')}
                     </label>
                     <input
                       type="number"
@@ -282,25 +635,62 @@ const CitizenPortal = () => {
                   </div>
                 </div>
 
-                {/* Document Upload */}
+                {/* Document Upload with OCR */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     {t('uploadDocuments')}
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <div className="flex justify-center gap-4 mb-4">
-                      <Button variant="outline" className="flex items-center gap-2">
-                        <Upload className="w-4 h-4" />
-                        {t('chooseFiles')}
-                      </Button>
-                      <Button variant="outline" className="flex items-center gap-2">
-                        <Camera className="w-4 h-4" />
-                        {t('takePhoto')}
-                      </Button>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="flex items-center gap-2 text-blue-600">
+                        <Scan className="w-5 h-5" />
+                        <span className="font-medium">{t('smartDocumentScanner')}</span>
+                      </div>
+                      <p className="text-sm text-gray-600 text-center mb-2">
+                        {t('scanDocumentsToAutofill')}
+                      </p>
+                      <div className="flex justify-center gap-4">
+                        <label htmlFor="file-upload">
+                          <Button 
+                            variant="outline" 
+                            className="flex items-center gap-2"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              document.getElementById('file-upload').click();
+                            }}
+                            disabled={processingOCR}
+                          >
+                            <Upload className="w-4 h-4" />
+                            {t('chooseFiles')}
+                          </Button>
+                        </label>
+                        <input
+                          id="file-upload"
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                        <Button 
+                          variant="outline" 
+                          className="flex items-center gap-2"
+                          onClick={startCamera}
+                          disabled={processingOCR}
+                        >
+                          <Camera className="w-4 h-4" />
+                          {t('scanDocument')}
+                        </Button>
+                      </div>
+                      {processingOCR && (
+                        <div className="flex items-center gap-2 text-blue-600 mt-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="text-sm">{t('processingDocumentAI')}</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">
+                        {t('supportedDocuments')}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600">
-                      {t('supportedFormats')}: PDF, JPG, PNG ({t('maxSize')}: 5MB)
-                    </p>
                   </div>
                 </div>
 
@@ -322,14 +712,42 @@ const CitizenPortal = () => {
                     </Button>
                   </div>
                   <p className="text-sm text-blue-700 mt-2">
-                    {t('voiceInstructions')}
+                    {t('useVoiceToFill')}
                   </p>
                 </div>
 
                 {/* Submit Button */}
-                <div className="flex justify-end">
-                  <Button className="px-8 py-2 bg-green-600 hover:bg-green-700">
-                    {t('submitClaim')}
+                <div className="flex justify-end gap-4">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setNewClaim({
+                        claimType: '',
+                        landArea: '',
+                        locationDescription: '',
+                        beneficiaryName: '',
+                        fatherName: '',
+                        documents: [],
+                        latitude: '',
+                        longitude: ''
+                      });
+                    }}
+                  >
+                    {t('reset') || 'Reset'}
+                  </Button>
+                  <Button 
+                    className="px-8 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleSubmitClaim}
+                    disabled={submittingClaim || !newClaim.beneficiaryName || !newClaim.locationDescription}
+                  >
+                    {submittingClaim ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('processing') || 'Processing...'}
+                      </>
+                    ) : (
+                      t('submitClaim')
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -347,14 +765,14 @@ const CitizenPortal = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{claim.id}</CardTitle>
                       <Badge className={getStatusColor(claim.status)}>
-                        {t(claim.status)}
+                        {getStatusText(claim.status)}
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-2">
                       {getStatusIcon(claim.status)}
-                      <span className="text-sm font-medium">{t(claim.claimType)}</span>
+                      <span className="text-sm font-medium">{claim.claimType}</span>
                     </div>
                     
                     <div className="space-y-2 text-sm">
@@ -419,15 +837,15 @@ const CitizenPortal = () => {
                     <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        {t('criteria1')}
+                        {t('mustBeResiding')}
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        {t('criteria2')}
+                        {t('dependentOnForest')}
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        {t('criteria3')}
+                        {t('occupationBefore2005')}
                       </li>
                     </ul>
                   </div>
@@ -437,15 +855,15 @@ const CitizenPortal = () => {
                     <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-start gap-2">
                         <FileText className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                        {t('document1')}
+                        {t('proofOfResidence')}
                       </li>
                       <li className="flex items-start gap-2">
                         <FileText className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                        {t('document2')}
+                        {t('evidenceOfOccupation')}
                       </li>
                       <li className="flex items-start gap-2">
                         <FileText className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                        {t('document3')}
+                        {t('selfDeclaration')}
                       </li>
                     </ul>
                   </div>
@@ -454,7 +872,7 @@ const CitizenPortal = () => {
                 <div className="bg-green-50 p-4 rounded-lg">
                   <h4 className="font-medium text-green-900 mb-2">{t('grievanceRedressal')}</h4>
                   <p className="text-sm text-green-800 mb-3">
-                    {t('grievanceInstructions')}
+                    {t('grievanceRedressalDesc')}
                   </p>
                   <Button variant="outline" size="sm" className="text-green-700 border-green-700">
                     {t('fileGrievance')}
@@ -465,6 +883,269 @@ const CitizenPortal = () => {
           </div>
         )}
       </div>
+
+      {/* Camera Modal */}
+      {showCamera && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2">
+                <Camera className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-lg">{t('scanDocument')}</h3>
+              </div>
+              <button
+                onClick={stopCamera}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="relative bg-black min-h-[400px]">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-auto max-h-[60vh] min-h-[400px] object-cover"
+                onLoadedMetadata={(e) => {
+                  console.log('Video metadata loaded');
+                  e.target.play();
+                }}
+              />
+              
+              {/* Loading indicator when stream is connecting */}
+              {!cameraStream && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black">
+                  <div className="text-center text-white">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                    <p>{t('connectingToCamera')}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Capture Guide Overlay */}
+              {cameraStream && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="border-2 border-white/50 border-dashed rounded-lg w-4/5 h-3/4 flex items-center justify-center">
+                    <span className="text-white bg-black/50 px-4 py-2 rounded-full text-sm">
+                      {t('positionDocumentInFrame')}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-gray-50">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm text-gray-600">
+                  {t('ensureDocumentClear')}
+                </p>
+                <Button
+                  onClick={captureImage}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <Camera className="w-4 h-4" />
+                  {t('captureAndProcess')}
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Scan className="w-4 h-4" />
+                <span>{t('aiWillExtract')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Canvas for Image Processing */}
+      <canvas ref={canvasRef} className="hidden" />
+      
+      {/* Workflow Result Modal */}
+      {showWorkflowModal && workflowResult && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  {workflowResult.status === 'approved' && <CheckCircle2 className="w-6 h-6 text-green-600" />}
+                  {(workflowResult.status === 'manual_review_required' || workflowResult.status === 'manual_review') && <Clock className="w-6 h-6 text-yellow-600" />}
+                  {workflowResult.status === 'blockchain_failed' && <AlertTriangle className="w-6 h-6 text-red-600" />}
+                  Application Verification Result
+                </CardTitle>
+                <button
+                  onClick={() => setShowWorkflowModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {/* Workflow ID and Status */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Workflow ID</p>
+                    <p className="font-mono font-bold text-blue-600">{workflowResult.workflow_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Status</p>
+                    <Badge className={getStatusColor(workflowResult.status)}>
+                      {workflowResult.status.toUpperCase().replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Blockchain & Hyperledger Hashes */}
+              {workflowResult.blockchain_hash && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🔗 Blockchain Verification
+                  </h3>
+                  <div className="bg-green-50 border border-green-200 p-3 rounded">
+                    <p className="text-xs text-gray-600">Transaction Hash</p>
+                    <p className="font-mono text-sm break-all">{workflowResult.blockchain_hash}</p>
+                  </div>
+                </div>
+              )}
+
+              {workflowResult.hyperledger_hash && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🔐 Hyperledger Record
+                  </h3>
+                  <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                    <p className="text-xs text-gray-600">Immutable Hash</p>
+                    <p className="font-mono text-sm break-all">{workflowResult.hyperledger_hash}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Location Verification */}
+              {workflowResult.location_match_score !== null && workflowResult.location_match_score !== undefined && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🛰️ Location Verification
+                  </h3>
+                  <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Match Score</span>
+                      <span className="font-bold text-lg">{workflowResult.location_match_score}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          workflowResult.location_match_score >= 70 ? 'bg-green-500' :
+                          workflowResult.location_match_score >= 40 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{width: `${workflowResult.location_match_score}%`}}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* DSS Recommendation */}
+              {workflowResult.dss_recommendation && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    🎯 Eligibility Evaluation (DSS)
+                  </h3>
+                  <div className="bg-purple-50 border border-purple-200 p-4 rounded space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Overall Score</span>
+                      <span className="font-bold text-2xl text-purple-600">
+                        {workflowResult.dss_recommendation.score}/100
+                      </span>
+                    </div>
+                    <div className="border-t pt-3">
+                      <p className="text-sm font-semibold mb-2">
+                        Recommendation: <span className="text-purple-600">{workflowResult.dss_recommendation.recommendation}</span>
+                      </p>
+                      {workflowResult.dss_recommendation.eligible_schemes && workflowResult.dss_recommendation.eligible_schemes.length > 0 && (
+                        <div>
+                          <p className="text-sm font-semibold mb-2">Eligible Schemes:</p>
+                          <ul className="space-y-1">
+                            {workflowResult.dss_recommendation.eligible_schemes.map((scheme, idx) => (
+                              <li key={idx} className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                {scheme}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {workflowResult.dss_recommendation.factors && workflowResult.dss_recommendation.factors.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-semibold mb-2">Scoring Factors:</p>
+                          <ul className="space-y-1">
+                            {workflowResult.dss_recommendation.factors.map((factor, idx) => (
+                              <li key={idx} className="text-sm text-gray-700">• {factor}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Final Decision */}
+              <div className={`p-4 rounded-lg border-2 ${
+                workflowResult.final_decision === 'approved' ? 'bg-green-50 border-green-300' :
+                'bg-yellow-50 border-yellow-300'
+              }`}>
+                <h3 className="font-bold text-lg mb-2">
+                  {workflowResult.final_decision === 'approved' ? '✅ Application Approved' : '⏳ Under Review'}
+                </h3>
+                <p className="text-sm">
+                  {workflowResult.final_decision === 'approved' 
+                    ? 'Congratulations! Your forest rights application has been automatically approved. You will receive further instructions via SMS/email.'
+                    : 'Your application has been forwarded to an officer for manual review. You will be notified of the outcome within 7-14 working days.'}
+                </p>
+              </div>
+
+              {/* Officer Report Info */}
+              {workflowResult.officer_report_id && (
+                <div className="bg-orange-50 border border-orange-200 p-4 rounded">
+                  <h4 className="font-semibold text-orange-800 mb-2">Officer Review Required</h4>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Report ID: <span className="font-mono font-bold">{workflowResult.officer_report_id}</span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    An officer has been assigned to review your application. Please keep this Report ID for tracking purposes.
+                  </p>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(workflowResult.workflow_id);
+                    toast.success('Workflow ID copied to clipboard');
+                  }}
+                >
+                  Copy Workflow ID
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowWorkflowModal(false);
+                    setActiveTab('track-claims'); // Switch to track claims tab
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Track Application
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

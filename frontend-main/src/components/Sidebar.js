@@ -9,139 +9,263 @@ import {
   BarChart3, 
   Shield,
   Trees,
-  Upload
+  Upload,
+  Users,
+  Settings,
+  Eye,
+  Briefcase,
+  Globe,
+  ChevronRight,
+  Satellite,
+  Leaf
 } from 'lucide-react';
 
-const Sidebar = ({ isOpen, userRole }) => {
+const Sidebar = ({ isOpen, userRole, onNavigate }) => {
   const { translate: t } = useTranslation();
   
-  const navigationItems = [
+  // Organized navigation with sections
+  const navigationSections = [
     {
-      name: t('home'),
-      href: '/',
-      icon: Home,
-      roles: ['admin', 'officer', 'verifier', 'viewer']
+      title: t('sidebarMain'),
+      items: [
+        {
+          name: t('sidebarHome'),
+          href: '/',
+          icon: Home,
+          roles: ['admin', 'officer', 'verifier', 'viewer'],
+          description: t('sidebarHomeLandingPage')
+        },
+        {
+          name: t('sidebarOverviewDashboard'),
+          href: '/dashboard',
+          icon: LayoutDashboard,
+          roles: ['admin', 'officer', 'verifier', 'viewer'],
+          description: t('sidebarOverviewDashboardDesc')
+        }
+      ]
     },
     {
-      name: t('dashboard'),
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      roles: ['admin', 'officer', 'verifier', 'viewer']
+      title: t('sidebarWorkManagement'),
+      items: [
+        {
+          name: t('sidebarMyWork'),
+          href: '/officer-dashboard',
+          icon: Briefcase,
+          roles: ['admin', 'officer'],
+          description: t('sidebarMyWorkDesc'),
+          badge: t('badgeOfficer')
+        },
+        {
+          name: t('sidebarFileClaim'),
+          href: '/citizen-portal',
+          icon: FileText,
+          roles: ['viewer'],
+          description: t('sidebarFileClaimDesc'),
+          badge: t('badgeNew')
+        },
+        {
+          name: t('sidebarCaseProcessing'),
+          href: '/cases',
+          icon: FileText,
+          roles: ['admin', 'officer', 'verifier'],
+          description: t('sidebarCaseProcessingDesc')
+        },
+        {
+          name: t('sidebarInteractiveMap'),
+          href: '/atlas',
+          icon: Map,
+          roles: ['admin', 'officer', 'verifier', 'viewer'],
+          description: t('sidebarInteractiveMapDesc')
+        },
+        {
+          name: t('sidebarForestMonitoring'),
+          href: '/monitoring',
+          icon: Satellite,
+          roles: ['admin', 'officer'],
+          badge: t('badgeRealtime'),
+          description: t('sidebarForestMonitoringDesc')
+        }
+      ]
     },
     {
-      name: t('officerDashboard'),
-      href: '/officer-dashboard',
-      icon: Shield,
-      roles: ['admin', 'officer']
+      title: t('sidebarAnalysisReports'),
+      items: [
+        {
+          name: t('sidebarAnalytics'),
+          href: '/analytics',
+          icon: BarChart3,
+          roles: ['admin', 'officer'],
+          description: t('sidebarAnalyticsDesc')
+        },
+        {
+          name: t('sidebarPublicPortal'),
+          href: '/transparency',
+          icon: Globe,
+          roles: ['admin', 'officer', 'verifier', 'viewer'],
+          description: t('sidebarPublicPortalDesc')
+        }
+      ]
     },
     {
-      name: t('caseManagement'),
-      href: '/cases',
-      icon: FileText,
-      roles: ['admin', 'officer', 'verifier']
-    },
-    {
-      name: t('forestAtlas'),
-      href: '/atlas',
-      icon: Map,
-      roles: ['admin', 'officer', 'verifier', 'viewer']
-    },
-    {
-      name: t('analytics'),
-      href: '/analytics',
-      icon: BarChart3,
-      roles: ['admin', 'officer']
-    },
-    {
-      name: t('adminPanel'),
-      href: '/admin',
-      icon: Shield,
-      roles: ['admin']
-    },
-    {
-      name: t('publicTransparencyPortal'),
-      href: '/transparency',
-      icon: BarChart3,
-      roles: ['admin', 'officer', 'verifier', 'viewer']
+      title: t('sidebarAdministration'),
+      items: [
+        {
+          name: t('sidebarSystemAdmin'),
+          href: '/admin',
+          icon: Settings,
+          roles: ['admin'],
+          description: t('sidebarSystemAdminDesc'),
+          badge: t('badgeAdminOnly')
+        }
+      ]
     }
   ];
 
-  const filteredItems = navigationItems.filter(item => 
-    item.roles.includes(userRole)
-  );
+  const getFilteredSections = () => {
+    return navigationSections.map(section => ({
+      ...section,
+      items: section.items.filter(item => item.roles.includes(userRole))
+    })).filter(section => section.items.length > 0);
+  };
+
+  const filteredSections = getFilteredSections();
 
   return (
-    <aside className={`bg-blue-900 text-white fixed left-0 top-0 h-full transition-all duration-300 z-40 ${isOpen ? 'w-64' : 'w-16'} shadow-lg`}>
-      {/* Header spacing */}
-      <div className="h-[120px]"></div>
+    <aside className={`bg-blue-900 text-white fixed left-0 top-0 h-full transition-all duration-300 shadow-lg
+      ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      ${isOpen ? 'w-64' : 'lg:w-16 w-64'}
+      z-50 lg:z-40`}>
+      {/* Sidebar Header with Branding */}
+      <div className="h-[120px] border-b border-blue-800/50">
+        <div className={`${isOpen ? 'p-4' : 'lg:p-2 p-4'} h-full flex flex-col justify-center`}>
+          {isOpen ? (
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                  <Leaf className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">VANADHARSHITA</h2>
+                  <p className="text-xs text-blue-200">FRA-Connect</p>
+                </div>
+              </div>
+              <p className="text-xs text-blue-300 pl-1">AI-Powered Forest Rights Portal</p>
+            </div>
+          ) : (
+            <div className="hidden lg:flex justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                <Leaf className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       
-      <div className={`${isOpen ? 'p-4' : 'p-2'} h-[calc(100%-120px)] overflow-y-auto`}>
+      <div className={`${isOpen ? 'p-4' : 'lg:p-2 p-4'} h-[calc(100%-120px)] overflow-y-auto`}>
         {/* Department Info */}
         {isOpen && (
           <div className="mb-6 pb-4 border-b border-blue-800">
             <div className="flex items-center space-x-2 mb-2">
               <Trees className="w-5 h-5 text-green-400" />
-              <span className="font-medium text-sm">Forest Department</span>
+              <span className="font-medium text-sm">{t('forestDepartment')}</span>
             </div>
-            <p className="text-xs text-blue-200">Digital India Initiative</p>
+            <p className="text-xs text-blue-200">{t('digitalIndiaInitiative')}</p>
           </div>
         )}
 
-        {/* Navigation Menu */}
-        <nav className={`${isOpen ? 'space-y-2' : 'space-y-3'}`}>
-          <div className={`${isOpen ? 'block' : 'hidden'} mb-4`}>
-            <h3 className="text-xs font-semibold text-blue-300 uppercase tracking-wider">
-              Navigation
-            </h3>
-          </div>
-
-          {filteredItems.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              className={({ isActive }) =>
-                `flex items-center ${isOpen ? 'space-x-3 px-3 py-3' : 'px-2 py-4 justify-center'} rounded-lg transition-all duration-200 group ${
-                  isActive
-                    ? 'bg-orange-500 text-white shadow-lg'
-                    : 'text-blue-100 hover:bg-blue-800 hover:text-white'
-                }`
-              }
-            >
-              <item.icon className={`${isOpen ? 'w-5 h-5' : 'w-7 h-7'} flex-shrink-0`} />
-              {isOpen && (
-                <span className="font-medium text-sm">{item.name}</span>
+        {/* Navigation Menu - Organized by Sections */}
+        <nav className={`${isOpen ? 'space-y-6' : 'lg:space-y-3 space-y-6'}`}>
+          {filteredSections.map((section, sectionIndex) => (
+            <div key={section.title}>
+              {/* Section Header */}
+              {(isOpen || window.innerWidth < 1024) && (
+                <div className="mb-3">
+                  <h3 className="text-xs font-semibold text-blue-300 uppercase tracking-wider px-1">
+                    {section.title}
+                  </h3>
+                </div>
               )}
-              {!isOpen && (
-                <span className="absolute left-16 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                  {item.name}
-                </span>
+              
+              {/* Section Items */}
+              <div className={`${isOpen ? 'space-y-1' : 'lg:space-y-2 space-y-1'}`}>
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    onClick={onNavigate}
+                    className={({ isActive }) =>
+                      `flex items-center rounded-lg transition-all duration-200 group relative
+                      ${isOpen ? 'space-x-3 px-3 py-2.5' : 'lg:px-2 lg:py-4 lg:justify-center px-3 py-2.5 space-x-3'}
+                      ${isActive
+                          ? 'bg-orange-500 text-white shadow-lg'
+                          : 'text-blue-100 hover:bg-blue-800 hover:text-white'
+                      }`
+                    }
+                    title={!isOpen ? item.name : item.description}
+                  >
+                    <item.icon className={`${isOpen ? 'w-5 h-5' : 'lg:w-6 lg:h-6 w-5 h-5'} flex-shrink-0`} />
+                    {(isOpen || window.innerWidth < 1024) && (
+                      <div className="flex-1 flex items-center justify-between">
+                        <span className="font-medium text-sm">{item.name}</span>
+                        {item.badge && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-400 text-white font-medium">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {!isOpen && window.innerWidth >= 1024 && (
+                      <span className="absolute left-16 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                        {item.name}
+                        {item.badge && ` (${item.badge})`}
+                      </span>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+              
+              {/* Section Divider */}
+              {(isOpen || window.innerWidth < 1024) && sectionIndex < filteredSections.length - 1 && (
+                <div className="mt-4 border-t border-blue-800/50"></div>
               )}
-            </NavLink>
+            </div>
           ))}
         </nav>
 
-        {/* Quick Stats (if space allows) */}
+        {/* User Role & System Status */}
         {isOpen && (
-          <div className="mt-8 p-3 bg-blue-800 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-100 mb-3">System Status</h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-blue-200">Server Status</span>
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span className="text-green-400">Online</span>
-                </div>
+          <div className="mt-8 space-y-3">
+            {/* User Role Badge */}
+            <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg">
+              <div className="flex items-center space-x-2 mb-1">
+                <Eye className="h-4 w-4 text-white" />
+                <span className="text-xs font-medium text-white/90">{t('currentRole')}</span>
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-blue-200">Database</span>
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span className="text-green-400">Connected</span>
+              <p className="text-sm font-bold text-white capitalize">{userRole}</p>
+            </div>
+            
+            {/* System Status */}
+            <div className="p-3 bg-blue-800 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-100 mb-3">{t('systemStatus')}</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-200">{t('serverStatus')}</span>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-green-400">{t('online')}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-blue-200">Last Sync</span>
-                <span className="text-blue-200">2 min ago</span>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-200">{t('database')}</span>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-green-400">{t('connected')}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-200">{t('lastSync')}</span>
+                  <span className="text-blue-200">2 {t('minAgo')}</span>
+                </div>
               </div>
             </div>
           </div>

@@ -1,28 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import translationService from '../services/translationService';
 
-// Import all translation files
+// Keep minimal English base translations for initial render
+// Everything else will be translated via Google Translate API on-demand
 import enTranslations from '../translations/en.json';
-import hiTranslations from '../translations/hi.json';
-import tribalTranslations from '../translations/tribal.json';
-import orTranslations from '../translations/or.json';
-import teTranslations from '../translations/te.json';
-import bnTranslations from '../translations/bn.json';
-import satTranslations from '../translations/sat.json';
-import gonTranslations from '../translations/gon.json';
-import kokTranslations from '../translations/kok.json';
-
-const translations = {
-  en: enTranslations,
-  hi: hiTranslations,
-  tribal: tribalTranslations,
-  or: orTranslations,
-  te: teTranslations,
-  bn: bnTranslations,
-  sat: satTranslations,
-  gon: gonTranslations,
-  kok: kokTranslations
-};
 
 const LanguageContext = createContext();
 
@@ -36,41 +17,68 @@ export const useTranslation = () => {
 
 export const LanguageProvider = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState('en');
-  const [dynamicTranslations, setDynamicTranslations] = useState({});
+  const [apiTranslations, setApiTranslations] = useState({});
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translationQueue, setTranslationQueue] = useState(new Set());
 
   // Get supported languages from translation service
   const supportedLanguages = translationService.getAllSupportedLanguages();
 
+  // Smart translation function - uses API for all non-English languages
   const translate = (key) => {
-    // First try local translations
-    const localTranslation = translations[currentLanguage]?.[key];
-    if (localTranslation) {
-      return localTranslation;
+    // If English, return base translation immediately
+    if (currentLanguage === 'en') {
+      return enTranslations[key] || key;
     }
 
-    // Then try dynamic translations
-    const dynamicKey = `${currentLanguage}-${key}`;
-    const dynamicTranslation = dynamicTranslations[dynamicKey];
-    if (dynamicTranslation) {
-      return dynamicTranslation;
+    // Check if we have this translation cached in API translations
+    const cacheKey = `${currentLanguage}-${key}`;
+    if (apiTranslations[cacheKey]) {
+      return apiTranslations[cacheKey];
     }
 
-    // Fallback to English or the key itself
-    return translations.en[key] || key;
+    // If not cached, queue for translation and return English temporarily
+    const englishText = enTranslations[key] || key;
+    
+    // Queue this translation for background processing
+    if (!translationQueue.has(cacheKey)) {
+      setTranslationQueue(prev => new Set(prev).add(cacheKey));
+      translateInBackground(englishText, key);
+    }
+
+    // Return English text while translation is pending
+    return englishText;
   };
 
+  // Background translation - doesn't block UI
+  const translateInBackground = async (text, key) => {
+    try {
+      const translated = await translationService.translateText(text, currentLanguage, 'en');
+      const cacheKey = `${currentLanguage}-${key}`;
+      
+      setApiTranslations(prev => ({
+        ...prev,
+        [cacheKey]: translated
+      }));
+      
+      // Remove from queue
+      setTranslationQueue(prev => {
+        const newQueue = new Set(prev);
+        newQueue.delete(cacheKey);
+        return newQueue;
+      });
+    } catch (error) {
+      console.error(`Translation failed for ${key}:`, error);
+    }
+  };
+
+  // Translate dynamic text (for user-generated content, etc.)
   const translateDynamic = async (text, targetLang = currentLanguage) => {
     if (!text || targetLang === 'en') return text;
     
     setIsTranslating(true);
     try {
       const translated = await translationService.translateText(text, targetLang, 'en');
-      const dynamicKey = `${targetLang}-${text}`;
-      setDynamicTranslations(prev => ({
-        ...prev,
-        [dynamicKey]: translated
-      }));
       return translated;
     } catch (error) {
       console.error('Dynamic translation failed:', error);
@@ -81,41 +89,17 @@ export const LanguageProvider = ({ children }) => {
   };
 
   const changeLanguage = async (language) => {
-    if (translations[language] || supportedLanguages.find(lang => lang.code === language)) {
+    if (supportedLanguages.find(lang => lang.code === language)) {
       setCurrentLanguage(language);
       console.log(`Language changed to: ${language}`);
       
       // Store language preference
       localStorage.setItem('fra-language', language);
 
-      // Pre-load common translations for dynamic languages
-      if (!translations[language] && language !== 'en') {
-        await preloadTranslations(language);
-      }
-    }
-  };
-
-  const preloadTranslations = async (language) => {
-    const commonKeys = ['welcome', 'dashboard', 'forestAtlas', 'caseManagement', 'analytics'];
-    const englishTexts = commonKeys.map(key => translations.en[key]).filter(Boolean);
-    
-    if (englishTexts.length > 0) {
-      try {
-        const translatedTexts = await translationService.batchTranslate(englishTexts, language, 'en');
-        const newDynamicTranslations = {};
-        
-        englishTexts.forEach((text, index) => {
-          const dynamicKey = `${language}-${text}`;
-          newDynamicTranslations[dynamicKey] = translatedTexts[index];
-        });
-        
-        setDynamicTranslations(prev => ({
-          ...prev,
-          ...newDynamicTranslations
-        }));
-      } catch (error) {
-        console.error('Preload translations failed:', error);
-      }
+      // Clear API translations cache when changing language
+      // New translations will be fetched as needed
+      setApiTranslations({});
+      setTranslationQueue(new Set());
     }
   };
 
@@ -125,16 +109,23 @@ export const LanguageProvider = ({ children }) => {
 
   const clearTranslationCache = () => {
     translationService.clearCache();
-    setDynamicTranslations({});
+    setApiTranslations({});
+    setTranslationQueue(new Set());
   };
 
   // Load saved language preference on mount
   useEffect(() => {
     const savedLanguage = localStorage.getItem('fra-language');
-    if (savedLanguage && (translations[savedLanguage] || supportedLanguages.find(lang => lang.code === savedLanguage))) {
+    if (savedLanguage && supportedLanguages.find(lang => lang.code === savedLanguage)) {
       setCurrentLanguage(savedLanguage);
     }
-  }, []);
+  }, [supportedLanguages]);
+
+  // Trigger re-render when language changes or translations update
+  useEffect(() => {
+    // Force component updates when API translations are loaded
+    // This ensures UI updates with new translations
+  }, [apiTranslations]);
 
   const value = {
     currentLanguage,

@@ -1,0 +1,40 @@
+# Production ML Requirements for FRA Atlas AI Service
+# Python 3.13 Compatible Version
+
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Computer Vision & OCR
+Pillow>=10.2.0
+pytesseract==0.3.10
+opencv-python>=4.8.0
+pdf2image==1.16.3
+
+# ML & NLP - SpaCy (Updated for Python 3.13)
+spacy>=3.8.0  # Latest version with Python 3.13 support
+# Run after install: python -m spacy download en_core_web_sm
+# For better accuracy: python -m spacy download en_core_web_md
+
+# EasyOCR for multilingual support (Optional - may have build issues)
+# easyocr==1.7.1
+# If EasyOCR fails, service will gracefully fall back to Tesseract
+
+# Batch Processing (Optional)
+redis>=5.0.0
+rq>=1.15.0
+
+# Additional ML libraries
+numpy>=1.26.0
+pandas>=2.1.0
+openpyxl>=3.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+aiofiles>=23.2.0
+
+# Satellite Analysis (Optional - for real satellite data)
+earthengine-api>=0.1.384  # Google Earth Engine
+# After install, authenticate: earthengine authenticate
+# Note: Requires Google account and Earth Engine access (free for research)

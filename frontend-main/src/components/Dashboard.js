@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useTranslation } from '../contexts/LanguageContext';
+import { LoadingSpinner } from './ui/loading-spinner';
+import { ErrorMessage, EmptyState } from './ui/error-message';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -15,7 +17,8 @@ import {
   TreePine,
   IndianRupee,
   Activity,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../App';
@@ -27,8 +30,9 @@ const API = `${BACKEND_URL}/api`;
 const Dashboard = () => {
   const { translate: t, currentLanguage } = useTranslation();
   const [stats, setStats] = useState(null);
-  const [recentClaims, setRecentClaims] = useState([]);
+  const [recentClaims, setRecentClaims] = useState([]); // Always initialize as empty array
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -37,19 +41,31 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      setError(null);
       const [statsResponse, claimsResponse] = await Promise.all([
         axios.get(`${API}/dashboard/stats`).catch(() => ({ data: getDefaultStats() })),
         axios.get(`${API}/claims?limit=5`).catch(() => ({ data: getDefaultClaims() }))
       ]);
       
       setStats(statsResponse.data);
-      setRecentClaims(claimsResponse.data.slice(0, 5));
+      // Ensure claimsResponse.data is always an array
+      const claimsData = Array.isArray(claimsResponse.data) 
+        ? claimsResponse.data 
+        : (claimsResponse.data?.claims || []);
+      setRecentClaims(claimsData.slice(0, 5));
+      
+      // Success toast only if data was actually fetched
+      if (statsResponse.data && statsResponse.data.total_claims !== undefined) {
+        toast.success('Dashboard data loaded successfully', { duration: 2000 });
+      }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
       // Use fallback data instead of showing error
       setStats(getDefaultStats());
       setRecentClaims(getDefaultClaims());
+      setError('Backend connection pending');
       console.warn('Using fallback data for dashboard');
+      toast.info('Displaying demo data - Backend connection pending', { duration: 3000 });
     } finally {
       setLoading(false);
     }
@@ -86,38 +102,54 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-2 text-slate-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner size="md" message={t('loadingDashboard')} submessage={t('fetchingLatestStatistics')} />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
+      {/* Backend Connection Warning */}
+      {error && (
+        <ErrorMessage 
+          type="info"
+          title={t('demoModeActive')}
+          message={t('displayingSampleData')}
+        />
+      )}
+
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white p-6 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2 text-orange-300">
+      <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white p-4 sm:p-6 rounded-lg shadow-lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold mb-2 text-orange-300">
               {t('welcome')}, {user?.full_name}
             </h1>
-            <p className="text-blue-100">
+            <p className="text-sm sm:text-base text-blue-100">
               {user?.role && user.role.charAt(0).toUpperCase() + user.role.slice(1)} | {user?.department}
             </p>
             {user?.district && (
-              <p className="text-blue-200 text-sm mt-1">
-                <MapPin className="w-4 h-4 inline mr-1" />
+              <p className="text-blue-200 text-xs sm:text-sm mt-1">
+                <MapPin className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1" />
                 {user.district}, {user.state}
               </p>
             )}
           </div>
-          <div className="text-right">
-            <p className="text-blue-200 text-sm">{t('todaysDate')}</p>
-            <p className="text-xl font-semibold">
+          <div className="text-left sm:text-right w-full sm:w-auto">
+            <div className="flex items-center space-x-2 sm:space-x-3 mb-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setLoading(true);
+                  fetchDashboardData();
+                }}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs sm:text-sm"
+              >
+                <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
+                {t('refresh')}
+              </Button>
+            </div>
+            <p className="text-blue-200 text-xs sm:text-sm">{t('todaysDate')}</p>
+            <p className="text-lg sm:text-xl font-semibold">
               {new Date().toLocaleDateString(
                 currentLanguage === 'bn' ? 'bn-BD' : 
                 currentLanguage === 'hi' ? 'hi-IN' : 
@@ -130,7 +162,7 @@ const Dashboard = () => {
       </div>
 
       {/* Key Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -310,7 +342,7 @@ const Dashboard = () => {
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <FileText className="w-5 h-5 text-blue-600" />
-              <span>Recent Claims</span>
+              <span>{t('recentClaims')}</span>
             </div>
             <Button variant="outline" size="sm">
               <ExternalLink className="w-4 h-4 mr-2" />
@@ -320,10 +352,10 @@ const Dashboard = () => {
           <CardDescription>{t('latestApplications')}</CardDescription>
         </CardHeader>
         <CardContent>
-          {recentClaims.length > 0 ? (
+          {Array.isArray(recentClaims) && recentClaims.length > 0 ? (
             <div className="space-y-4">
               {recentClaims.map((claim) => (
-                <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50">
+                <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                       <FileText className="w-5 h-5 text-blue-600" />
@@ -331,7 +363,7 @@ const Dashboard = () => {
                     <div>
                       <p className="font-medium text-slate-900">{claim.beneficiary_name}</p>
                       <p className="text-sm text-slate-600">{claim.village_name} | {claim.claim_type}</p>
-                      <p className="text-xs text-slate-500">Area: {claim.area_claimed} hectares</p>
+                      <p className="text-xs text-slate-500">{t('areaLabel')}: {claim.area_claimed} {t('hectares')}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -346,10 +378,11 @@ const Dashboard = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-600">No recent claims found</p>
-            </div>
+            <EmptyState 
+              icon={FileText}
+              title={t('recentClaimsEmpty')}
+              message={t('recentClaimsEmptyMessage')}
+            />
           )}
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
+import { useTranslation } from '../contexts/LanguageContext';
 import { 
   BarChart3, 
   PieChart, 
@@ -27,9 +28,10 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const Analytics = () => {
+  const { translate: t } = useTranslation();
   const [stats, setStats] = useState(null);
-  const [claims, setClaims] = useState([]);
-  const [villages, setVillages] = useState([]);
+  const [claims, setClaims] = useState([]); // Always initialize as empty array
+  const [villages, setVillages] = useState([]); // Always initialize as empty array
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('all');
   const [stateFilter, setStateFilter] = useState('');
@@ -47,17 +49,23 @@ const Analytics = () => {
       ]);
       
       setStats(statsResponse.data);
-      setClaims(claimsResponse.data);
-      setVillages(villagesResponse.data);
+      // Ensure data is always an array
+      setClaims(Array.isArray(claimsResponse.data) ? claimsResponse.data : []);
+      setVillages(Array.isArray(villagesResponse.data) ? villagesResponse.data : []);
     } catch (error) {
       console.error('Failed to fetch analytics data:', error);
       toast.error('Failed to load analytics data');
+      // Set empty arrays on error
+      setClaims([]);
+      setVillages([]);
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusDistribution = () => {
+    if (!Array.isArray(claims) || claims.length === 0) return [];
+    
     const statusCounts = claims.reduce((acc, claim) => {
       acc[claim.status] = (acc[claim.status] || 0) + 1;
       return acc;
@@ -71,6 +79,8 @@ const Analytics = () => {
   };
 
   const getStateWiseStats = () => {
+    if (!Array.isArray(villages) || villages.length === 0) return [];
+    
     const stateStats = villages.reduce((acc, village) => {
       if (!acc[village.state]) {
         acc[village.state] = {
@@ -93,12 +103,14 @@ const Analytics = () => {
     }, {});
 
     // Add claims count
-    claims.forEach(claim => {
-      const village = villages.find(v => v.id === claim.village_id);
-      if (village && stateStats[village.state]) {
-        stateStats[village.state].claims += 1;
-      }
-    });
+    if (Array.isArray(claims)) {
+      claims.forEach(claim => {
+        const village = villages.find(v => v.id === claim.village_id);
+        if (village && stateStats[village.state]) {
+          stateStats[village.state].claims += 1;
+        }
+      });
+    }
 
     return Object.entries(stateStats).map(([state, data]) => ({
       state,
@@ -107,6 +119,8 @@ const Analytics = () => {
   };
 
   const getMonthlyTrends = () => {
+    if (!Array.isArray(claims) || claims.length === 0) return [];
+    
     const monthlyData = claims.reduce((acc, claim) => {
       const month = new Date(claim.submitted_date).toLocaleString('default', { month: 'short', year: 'numeric' });
       acc[month] = (acc[month] || 0) + 1;
@@ -143,7 +157,7 @@ const Analytics = () => {
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-2 text-slate-600">Loading analytics...</p>
+          <p className="mt-2 text-slate-600">{t('loadingAnalytics')}</p>
         </div>
       </div>
     );
@@ -154,46 +168,46 @@ const Analytics = () => {
   const monthlyTrends = getMonthlyTrends();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-blue-900">Analytics Dashboard</h1>
-          <p className="text-slate-600">Comprehensive insights into forest rights data</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-blue-900">{t('analyticsDashboard')}</h1>
+          <p className="text-sm sm:text-base text-slate-600">{t('comprehensiveInsights')}</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
           <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Time Period" />
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder={t('timePeriod')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="30d">Last 30 Days</SelectItem>
-              <SelectItem value="90d">Last 3 Months</SelectItem>
-              <SelectItem value="1y">Last Year</SelectItem>
+              <SelectItem value="all">{t('allTime')}</SelectItem>
+              <SelectItem value="30d">{t('last30Days')}</SelectItem>
+              <SelectItem value="90d">{t('last3Months')}</SelectItem>
+              <SelectItem value="1y">{t('lastYear')}</SelectItem>
             </SelectContent>
           </Select>
           
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            {t('exportReport')}
           </Button>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Processing Rate</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('processingRate')}</p>
                 <p className="text-3xl font-bold text-blue-900">
                   {stats?.total_claims ? Math.round(((stats.approved_claims + stats.rejected_claims) / stats.total_claims) * 100) : 0}%
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-xs text-green-600">+12% from last month</span>
+                  <span className="text-xs text-green-600">+12% {t('fromLastMonth')}</span>
                 </div>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -207,13 +221,13 @@ const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Approval Rate</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('approvalRate')}</p>
                 <p className="text-3xl font-bold text-green-700">
                   {stats?.total_claims ? Math.round((stats.approved_claims / stats.total_claims) * 100) : 0}%
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-xs text-green-600">+8% from last month</span>
+                  <span className="text-xs text-green-600">+8% {t('fromLastMonth')}</span>
                 </div>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -227,12 +241,12 @@ const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 mb-1">Avg. Processing Time</p>
+                <p className="text-sm font-medium text-slate-600 mb-1">{t('averageProcessingTime')}</p>
                 <p className="text-3xl font-bold text-orange-600">28</p>
-                <p className="text-sm text-slate-500">days</p>
+                <p className="text-sm text-slate-500">{t('days')}</p>
                 <div className="flex items-center mt-2">
                   <TrendingDown className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-xs text-green-600">-5 days improved</span>
+                  <span className="text-xs text-green-600">-5 {t('days')} improved</span>
                 </div>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">

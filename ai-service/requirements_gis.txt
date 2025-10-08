@@ -1,0 +1,21 @@
+# Geospatial Processing Dependencies for FRA Atlas
+# Install with: pip install -r requirements_gis.txt
+
+# Core geospatial libraries
+geopandas>=0.14.0          # Geospatial data manipulation
+shapely>=2.0.0             # Geometric operations
+fiona>=1.9.0               # Shapefile reading
+pyproj>=3.6.0              # Coordinate system transformations
+
+# Optional but recommended
+rtree>=1.1.0               # Spatial indexing for performance
+rasterio>=1.3.0            # Raster data handling (for satellite imagery)
+contextily>=1.4.0          # Basemap tiles
+mapclassify>=2.5.0         # Choropleth classification
+
+# For GDAL support (may require system GDAL installation)
+# gdal>=3.4.0              # Uncomment if needed
+
+# Plotting (optional)
+matplotlib>=3.7.0
+descartes>=1.1.0           # Plot Shapely geometries
