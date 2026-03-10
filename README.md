@@ -1,6 +1,6 @@
-# 🌲 FRA Atlas - Forest Rights Digital Atlas
+# FRA Atlas - Forest Rights Digital Atlas
 
-## 🚀 **ALL SERVICES ARE WORKING AND UPLOADED TO GITHUB!**
+## **ALL SERVICES ARE WORKING AND UPLOADED TO GITHUB!**
 
 This is a comprehensive digital platform for Forest Rights Act (FRA) management with blockchain verification, multilingual support (22+ tribal languages), and real-time document processing.
 
